@@ -1,0 +1,29 @@
+# humanstxt.org
+
+# TEAM
+
+    Legal Services Team
+    Site: https://marqlegal.com
+    Location: United States
+
+# THANKS
+
+    Trademark Attorneys
+    Brand Protection Specialists
+    USPTO Filing Experts
+
+# SITE
+
+    Last update: 2025-12-05
+    Standards: HTML5, CSS3, JavaScript ES6+
+    Components: React, TypeScript, Tailwind CSS
+    Software: Vite, Supabase
+    Accessibility: WCAG 2.1 Level AA
+    Languages: English
+    Doctype: HTML5
+    IDE: Visual Studio Code
+
+# CONTACT
+
+    Email: info@marqlegal.com
+    Website: https://marqlegal.com
