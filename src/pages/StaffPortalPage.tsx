@@ -256,30 +256,16 @@ export default function StaffPortalPage() {
     setLoggingIn(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        console.error('Login error:', error);
-        throw error;
-      }
-
-      console.log('Login successful, session:', data.session?.user?.email);
-      console.log('User metadata:', data.session?.user?.app_metadata);
+      if (error) throw error;
 
       setIsAuthenticated(true);
-
-      try {
-        await fetchAllData();
-      } catch (fetchError: any) {
-        console.error('Error fetching data after login:', fetchError);
-        console.error('Error details:', JSON.stringify(fetchError, null, 2));
-        throw new Error(`Failed to load data: ${fetchError.message || fetchError.toString()}`);
-      }
+      await fetchAllData();
     } catch (error: any) {
-      console.error('Full error object:', error);
       setLoginError(error.message || 'Failed to login');
     } finally {
       setLoggingIn(false);
@@ -303,40 +289,19 @@ export default function StaffPortalPage() {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      console.log('Starting to fetch all data...');
-
-      const queries = [
-        { name: 'contact_submissions', query: supabase.from('contact_submissions').select('*').order('created_at', { ascending: false }) },
-        { name: 'trademark_search_requests', query: supabase.from('trademark_search_requests').select('*').order('created_at', { ascending: false }) },
-        { name: 'payments', query: supabase.from('payments').select('*').order('created_at', { ascending: false }) },
-        { name: 'client_agreements', query: supabase.from('client_agreements').select('*').order('created_at', { ascending: false }) },
-        { name: 'client_cases', query: supabase.from('client_cases').select('*').order('created_at', { ascending: false }) },
-        { name: 'analytics_events', query: supabase.from('analytics_events').select('event_type, event_data, created_at') },
-        { name: 'trademark_questionnaire_responses', query: supabase.from('trademark_questionnaire_responses').select('*').order('created_at', { ascending: false }) },
-        { name: 'incomplete_form_emails', query: supabase.from('incomplete_form_emails').select('session_id, sent_at') },
-        { name: 'incomplete_form_views', query: supabase.from('incomplete_form_views').select('session_id, viewed_at') },
-        { name: 'office_action_requests', query: supabase.from('office_action_requests').select('*').order('created_at', { ascending: false }) },
-        { name: 'cease_and_desist_requests', query: supabase.from('cease_and_desist_requests').select('*').order('created_at', { ascending: false }) }
-      ];
-
-      const results = await Promise.all(
-        queries.map(async ({ name, query }) => {
-          try {
-            const result = await query;
-            if (result.error) {
-              console.error(`Error fetching ${name}:`, result.error);
-              throw new Error(`${name}: ${result.error.message}`);
-            }
-            console.log(`Successfully fetched ${name}, count:`, result.data?.length || 0);
-            return result;
-          } catch (error) {
-            console.error(`Exception fetching ${name}:`, error);
-            throw error;
-          }
-        })
-      );
-
-      const [contactsRes, trademarksRes, paymentsRes, agreementsRes, casesRes, analyticsRes, questionnairesRes, incompleteEmailsRes, incompleteViewsRes, officeActionsRes, ceaseDesistRes] = results;
+      const [contactsRes, trademarksRes, paymentsRes, agreementsRes, casesRes, analyticsRes, questionnairesRes, incompleteEmailsRes, incompleteViewsRes, officeActionsRes, ceaseDesistRes] = await Promise.all([
+        supabase.from('contact_submissions').select('*').order('created_at', { ascending: false }),
+        supabase.from('trademark_search_requests').select('*').order('created_at', { ascending: false }),
+        supabase.from('payments').select('*').order('created_at', { ascending: false }),
+        supabase.from('client_agreements').select('*').order('created_at', { ascending: false }),
+        supabase.from('client_cases').select('*').order('created_at', { ascending: false }),
+        supabase.from('analytics_events').select('event_type, event_data, created_at'),
+        supabase.from('trademark_questionnaire_responses').select('*').order('created_at', { ascending: false }),
+        supabase.from('incomplete_form_emails').select('session_id, sent_at'),
+        supabase.from('incomplete_form_views').select('session_id, viewed_at'),
+        supabase.from('office_action_requests').select('*').order('created_at', { ascending: false }),
+        supabase.from('cease_and_desist_requests').select('*').order('created_at', { ascending: false })
+      ]);
 
       if (contactsRes.data) setContactSubmissions(contactsRes.data);
       if (trademarksRes.data) {
