@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Upload, Check, Loader2, CheckCircle, XCircle, ExternalLink, AlertTriangle, Type, MessageSquare, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { trackAnalyticsEvent, trackConversion } from '../utils/tracking';
+import { notifyQuestionnaireCompleted } from '../utils/notifications';
 
 interface FormData {
   trademarkName: string;
@@ -426,8 +427,20 @@ export default function GetStartedPage() {
             package_selected: finalPackageName,
             confirmation_accurate: formData.confirmationAccurate,
             confirmation_understand: formData.confirmationUnderstand,
-          });
+          })
+          .select();
         error = result.error;
+
+        if (!error && result.data && result.data[0]) {
+          notifyQuestionnaireCompleted(
+            formData.fullName,
+            formData.email,
+            formData.trademarkName,
+            formData.phone,
+            finalPackageName,
+            result.data[0].id
+          ).catch(err => console.error('Notification error:', err));
+        }
       }
 
       if (error) throw error;

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, Check, Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { notifyCeaseAndDesistRequest } from '../utils/notifications';
 
 interface FormData {
   fullName: string;
@@ -138,6 +139,15 @@ export default function CeaseAndDesistIntakePage() {
         .single();
 
       if (insertError) throw new Error(`Database error: ${insertError.message}`);
+
+      await notifyCeaseAndDesistRequest(
+        formData.fullName,
+        formData.email,
+        formData.trademarkName,
+        formData.phone,
+        formData.infringerName,
+        requestData.id
+      ).catch(err => console.error('Notification error:', err));
 
       navigate('/agreement', {
         state: {

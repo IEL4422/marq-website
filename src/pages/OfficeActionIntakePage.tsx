@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Upload, Check, Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { notifyOfficeActionRequest } from '../utils/notifications';
 
 interface FormData {
   fullName: string;
@@ -137,6 +138,15 @@ export default function OfficeActionIntakePage() {
         .single();
 
       if (insertError) throw new Error(`Database error: ${insertError.message}`);
+
+      await notifyOfficeActionRequest(
+        formData.fullName,
+        formData.email,
+        formData.trademarkName,
+        formData.phone,
+        serviceType,
+        requestData.id
+      ).catch(err => console.error('Notification error:', err));
 
       navigate('/agreement', {
         state: {

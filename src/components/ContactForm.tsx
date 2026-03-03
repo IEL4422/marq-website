@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Send } from 'lucide-react';
+import { notifyContactInquiry } from '../utils/notifications';
 
 export default function ContactForm() {
   const [formData, setFormData] = useState({
@@ -28,23 +29,12 @@ export default function ContactForm() {
       }
 
       try {
-        const notificationUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-contact-notification`;
-        const notificationResponse = await fetch(notificationUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: formData.name,
-            email: formData.email,
-            message: formData.message
-          }),
-        });
-
-        if (!notificationResponse.ok) {
-          console.error('Notification failed:', await notificationResponse.text());
-        }
+        await notifyContactInquiry(
+          formData.name,
+          formData.email,
+          formData.message,
+          data[0].id
+        );
       } catch (notificationError) {
         console.error('Notification error (non-critical):', notificationError);
       }

@@ -171,8 +171,10 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
+        const packageName = payment.metadata?.package_name || "Trademark Service";
+
         await fetch(
-          `${supabaseUrl}/functions/v1/send-purchase-webhook`,
+          `${supabaseUrl}/functions/v1/zapier-notification`,
           {
             method: "POST",
             headers: {
@@ -180,16 +182,21 @@ Deno.serve(async (req: Request) => {
               "Authorization": `Bearer ${supabaseServiceKey}`,
             },
             body: JSON.stringify({
-              agreementId: payment.agreement_id,
-              clientEmail: payment.client_email,
-              packageName: payment.agreement_id ? "Trademark Service" : "Service Package",
-              amount: payment.amount,
+              eventType: "payment_completed",
+              data: {
+                email: payment.client_email,
+                amount: payment.amount,
+                currency: payment.currency || "usd",
+                package_name: packageName,
+                payment_id: payment.id,
+                stripe_payment_intent_id: paymentIntent.id,
+              },
             }),
           }
         );
-        console.log("Purchase notification sent");
+        console.log("Payment notification sent to Zapier");
       } catch (err) {
-        console.error("Failed to send purchase notification:", err);
+        console.error("Failed to send payment notification:", err);
       }
     } else if (event.type === "payment_intent.payment_failed") {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;

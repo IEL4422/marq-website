@@ -6,6 +6,7 @@ import { updatePageSEO, pageSEO } from '../utils/seo';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import StripePaymentForm from '../components/StripePaymentForm';
+import { notifyTrademarkSearchRequest } from '../utils/notifications';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -124,7 +125,7 @@ export default function TrademarkSearchRequestPage() {
         logoUrl = urlData.publicUrl;
       }
 
-      const { error: submitError } = await supabase
+      const { data: requestData, error: submitError } = await supabase
         .from('trademark_search_requests')
         .insert([
           {
@@ -134,24 +135,20 @@ export default function TrademarkSearchRequestPage() {
             logo_url: logoUrl || null,
             business_description: formData.businessDescription
           }
-        ]);
+        ])
+        .select();
 
       if (submitError) throw submitError;
 
-      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-trademark-search-webhook`;
-      await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.fullName,
-          email: formData.email,
-          trademarkName: formData.trademarkName,
-          businessDescription: formData.businessDescription
-        })
-      }).catch(err => console.error('Webhook error:', err));
+      if (requestData && requestData[0]) {
+        await notifyTrademarkSearchRequest(
+          formData.fullName,
+          formData.email,
+          formData.trademarkName,
+          formData.businessDescription,
+          requestData[0].id
+        ).catch(err => console.error('Notification error:', err));
+      }
 
       setSubmitted(true);
     } catch (err) {
