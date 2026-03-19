@@ -303,6 +303,19 @@ export default function StaffPortalPage() {
         supabase.from('cease_and_desist_requests').select('*').order('created_at', { ascending: false })
       ]);
 
+      // Check for errors in each query
+      if (contactsRes.error) throw new Error(`contact_submissions: ${contactsRes.error.message}`);
+      if (trademarksRes.error) throw new Error(`trademark_search_requests: ${trademarksRes.error.message}`);
+      if (paymentsRes.error) throw new Error(`payments: ${paymentsRes.error.message}`);
+      if (agreementsRes.error) throw new Error(`client_agreements: ${agreementsRes.error.message}`);
+      if (casesRes.error) throw new Error(`client_cases: ${casesRes.error.message}`);
+      if (analyticsRes.error) throw new Error(`analytics_events: ${analyticsRes.error.message}`);
+      if (questionnairesRes.error) throw new Error(`trademark_questionnaire_responses: ${questionnairesRes.error.message}`);
+      if (incompleteEmailsRes.error) throw new Error(`incomplete_form_emails: ${incompleteEmailsRes.error.message}`);
+      if (incompleteViewsRes.error) throw new Error(`incomplete_form_views: ${incompleteViewsRes.error.message}`);
+      if (officeActionsRes.error) throw new Error(`office_action_requests: ${officeActionsRes.error.message}`);
+      if (ceaseDesistRes.error) throw new Error(`cease_and_desist_requests: ${ceaseDesistRes.error.message}`);
+
       if (contactsRes.data) setContactSubmissions(contactsRes.data);
       if (trademarksRes.data) {
         setTrademarkRequests(trademarksRes.data);
@@ -437,8 +450,9 @@ export default function StaffPortalPage() {
           conversionRate: 0
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching data:', error);
+      setLoginError(error.message || 'Database error querying schema');
     } finally {
       setLoading(false);
     }
