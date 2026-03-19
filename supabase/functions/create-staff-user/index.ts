@@ -23,6 +23,24 @@ Deno.serve(async (req: Request) => {
       throw new Error("Missing environment variables");
     }
 
+    const { email, password } = await req.json();
+
+    if (!email || !password) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Email and password are required",
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
@@ -31,11 +49,14 @@ Deno.serve(async (req: Request) => {
     });
 
     const { data, error } = await supabase.auth.admin.createUser({
-      email: "contact@marqtrademarks.com",
-      password: "Marq2026!",
+      email,
+      password,
       email_confirm: true,
       app_metadata: {
-        role: "staff",
+        is_staff: true,
+      },
+      user_metadata: {
+        is_staff: true,
       },
     });
 
