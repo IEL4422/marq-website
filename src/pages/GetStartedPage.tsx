@@ -127,10 +127,9 @@ export default function GetStartedPage() {
         .from('trademark_search_requests')
         .insert({
           trademark_name: formData.trademarkName.trim(),
-          contact_name: formData.fullName || 'Unknown',
+          full_name: formData.fullName || 'Unknown',
           email: formData.email || 'pending@email.com',
-          phone: formData.phone || null,
-          description: `Search request from Get Started form. Business Type: ${formData.businessType || 'N/A'}`,
+          business_description: `Search request from Get Started form. Business Type: ${formData.businessType || 'N/A'}. Phone: ${formData.phone || 'N/A'}`,
           status: 'pending'
         });
 

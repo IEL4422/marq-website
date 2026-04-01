@@ -33,10 +33,9 @@ export default function DIYTrademarkSearchPage() {
         .from('trademark_search_requests')
         .insert({
           trademark_name: formData.trademarkName.trim(),
-          contact_name: formData.contactName.trim(),
+          full_name: formData.contactName.trim(),
           email: formData.email.trim(),
-          phone: formData.phone.trim() || null,
-          description: formData.description.trim() || null,
+          business_description: `${formData.phone ? `Phone: ${formData.phone.trim()} | ` : ''}${formData.description.trim() || 'No additional information provided'}`,
           status: 'pending'
         });
 
