@@ -1,3 +1,11 @@
+/*
+ * DEPRECATED: This edge function is no longer used.
+ * Trademark searches are now handled as form submissions that create records in the database.
+ * See DIYTrademarkSearchPage.tsx and GetStartedPage.tsx for the new implementation.
+ *
+ * This file is kept for reference only and can be deleted.
+ */
+
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const corsHeaders = {

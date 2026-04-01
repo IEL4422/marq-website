@@ -123,72 +123,30 @@ export default function GetStartedPage() {
     setSearchResults([]);
 
     try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/search-uspto-trademarks`;
+      const { error: insertError } = await supabase
+        .from('trademark_search_requests')
+        .insert({
+          trademark_name: formData.trademarkName.trim(),
+          contact_name: formData.fullName || 'Unknown',
+          email: formData.email || 'pending@email.com',
+          phone: formData.phone || null,
+          description: `Search request from Get Started form. Business Type: ${formData.businessType || 'N/A'}`,
+          status: 'pending'
+        });
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      if (insertError) {
+        console.error('Error creating search request:', insertError);
+      }
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
-          searchTerm: formData.trademarkName.trim(),
-          status: 'all'
-        }),
-        signal: controller.signal
+      trackAnalyticsEvent('trademark_search_requested', {
+        trademark_name: formData.trademarkName,
+        source: 'get_started_form'
       });
-
-      clearTimeout(timeoutId);
-
-      const data = await response.json();
-
-      if (data.unavailable) {
-        setSearchError('api_unavailable');
-        setSearchCompleted(true);
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to search trademarks');
-      }
-
-      if (data.trademarks && Array.isArray(data.trademarks)) {
-        const formattedResults: TrademarkResult[] = data.trademarks.map((tm: any) => ({
-          keyword: tm.keyword || formData.trademarkName,
-          serialNumber: tm.serialNumber || 'N/A',
-          registrationNumber: tm.registrationNumber,
-          markIdentification: tm.markIdentification || formData.trademarkName,
-          status: tm.status || 'Unknown',
-          statusLabel: tm.statusLabel,
-          statusCode: tm.statusCode,
-          statusDate: tm.statusDate || '',
-          statusDefinition: tm.statusDefinition,
-          filingDate: tm.filingDate || '',
-          registrationDate: tm.registrationDate,
-          abandonmentDate: tm.abandonmentDate,
-          expirationDate: tm.expirationDate,
-          logo: tm.logo,
-          description: tm.description,
-          owner: tm.owner || 'Not Available',
-          goodsServices: tm.goodsServices
-        }));
-        setSearchResults(formattedResults);
-      } else {
-        setSearchResults([]);
-      }
 
       setSearchCompleted(true);
     } catch (err) {
       console.error('Search error:', err);
-      if (err instanceof Error && err.name === 'AbortError') {
-        setSearchError('Search timed out. The trademark database may be slow to respond.');
-      } else {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        setSearchError(`Unable to search: ${errorMessage}`);
-      }
+      setSearchError('Unable to submit search request. You can continue with your application.');
       setSearchCompleted(true);
     } finally {
       setSearching(false);
@@ -583,193 +541,68 @@ export default function GetStartedPage() {
 
               {searching && (
                 <div className="text-center py-12">
-                  <Loader2 size={48} className="animate-spin text-amber-500 mx-auto mb-4" />
-                  <p className="text-lg text-slate-600">Searching USPTO database...</p>
-                  <p className="text-sm text-slate-500 mt-2">This may take a few moments</p>
+                  <Loader2 size={48} className="animate-spin text-blue-500 mx-auto mb-4" />
+                  <p className="text-lg text-slate-600">Submitting your search request...</p>
+                  <p className="text-sm text-slate-500 mt-2">Please wait a moment</p>
                 </div>
               )}
 
-              {searchError && searchError === 'api_unavailable' && (
-                <div className="bg-amber-50 border-2 border-amber-400 rounded-lg p-6">
-                  <div className="flex items-start gap-3 mb-4">
+              {searchError && (
+                <div className="bg-amber-50 border-2 border-amber-400 rounded-lg p-6 mb-6">
+                  <div className="flex items-start gap-3">
                     <AlertTriangle className="text-amber-600 flex-shrink-0 mt-1" size={24} />
                     <div>
-                      <h3 className="font-bold text-slate-900 mb-2">Search Unavailable</h3>
+                      <h3 className="font-bold text-slate-900 mb-2">Notice</h3>
                       <p className="text-slate-700 mb-3">
-                        The USPTO search is temporarily unavailable. You can continue with your application and we'll conduct a comprehensive search as part of our service.
+                        {searchError}
+                      </p>
+                      <p className="text-slate-700">
+                        We'll conduct a comprehensive trademark search as part of our service before filing your application.
                       </p>
                     </div>
                   </div>
                 </div>
               )}
 
-              {searchError && searchError !== 'api_unavailable' && (
-                <div className="bg-red-50 border-2 border-red-400 rounded-lg p-6">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="text-red-600 flex-shrink-0 mt-1" size={24} />
-                    <div>
-                      <h3 className="font-bold text-slate-900 mb-2">Search Error</h3>
-                      <p className="text-slate-700">{searchError}</p>
+              {searchCompleted && !searching && (
+                <div className="bg-blue-50 border-2 border-blue-500 rounded-lg p-8">
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="bg-blue-500 p-3 rounded-full">
+                      <CheckCircle size={32} className="text-white" />
                     </div>
+                    <div className="flex-1">
+                      <h3 className="text-2xl font-bold text-blue-900 mb-2">
+                        Search Request Submitted
+                      </h3>
+                      <p className="text-lg text-slate-700 mb-4">
+                        We've received your trademark search request for "{formData.trademarkName}".
+                      </p>
+                      <div className="bg-white rounded-lg p-4 border-2 border-blue-200">
+                        <p className="text-slate-700 text-sm mb-3">
+                          <span className="font-semibold">What's Next:</span>
+                        </p>
+                        <ul className="list-disc pl-5 text-slate-700 text-sm space-y-2">
+                          <li>Our attorney will conduct a comprehensive trademark search</li>
+                          <li>We'll check federal, state, and common law databases</li>
+                          <li>You'll receive the results before we file your application</li>
+                          <li>If any conflicts are found, we'll contact you to discuss options</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg border-2 border-blue-200 p-4">
+                    <p className="text-slate-700 text-sm">
+                      <span className="font-semibold">Want faster results?</span> For an expedited comprehensive search with detailed analysis, you can{' '}
+                      <button
+                        onClick={() => navigate('/trademark-search-request')}
+                        className="text-blue-600 hover:text-blue-700 font-semibold underline"
+                      >
+                        request our professional search service ($49)
+                      </button>.
+                    </p>
                   </div>
                 </div>
               )}
-
-              {searchCompleted && !searching && !searchError && (() => {
-                const activeMarks = searchResults.filter(r => {
-                  const status = r.status.toLowerCase();
-                  return !status.includes('abandoned') && !status.includes('cancelled') && !status.includes('dead');
-                });
-
-                if (activeMarks.length === 0) {
-                  return (
-                    <div className="bg-green-50 border-2 border-green-500 rounded-lg p-8">
-                      <div className="flex items-start gap-4 mb-6">
-                        <div className="bg-green-500 p-3 rounded-full">
-                          <CheckCircle size={32} className="text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-2xl font-bold text-green-900 mb-2">
-                            Good news! This name appears available
-                          </h3>
-                          <p className="text-lg text-slate-700 mb-4">
-                            We found no active trademarks matching "{formData.trademarkName}". This is a positive sign!
-                          </p>
-                          <div className="bg-white rounded-lg p-4 border-2 border-green-200">
-                            <p className="text-slate-700 text-sm">
-                              <span className="font-semibold">Note:</span> While no exact matches were found in the federal database, our comprehensive attorney search will also check state registrations, common law uses, and similar marks before filing.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div>
-                      <div className="bg-red-50 border-2 border-red-500 rounded-lg p-6 mb-6">
-                        <div className="flex items-start gap-4">
-                          <div className="bg-red-500 p-3 rounded-full">
-                            <XCircle size={32} className="text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="text-2xl font-bold text-red-900 mb-2">
-                              {activeMarks.length === 1 ? 'Potential Conflict Found' : `${activeMarks.length} Potential Conflicts Found`}
-                            </h3>
-                            <p className="text-lg text-slate-700 mb-4">
-                              We found {activeMarks.length} active trademark{activeMarks.length !== 1 ? 's' : ''} that may conflict with "{formData.trademarkName}".
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4 mb-6">
-                        <h4 className="font-semibold text-slate-900">Conflicting Trademarks:</h4>
-                        {activeMarks.slice(0, 3).map((result, index) => (
-                          <div
-                            key={index}
-                            className="bg-white rounded-lg shadow-md p-4 border-l-4 border-red-500"
-                          >
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1 flex items-start gap-3">
-                                {result.logo && (
-                                  <img
-                                    src={result.logo}
-                                    alt={result.markIdentification}
-                                    className="w-16 h-16 object-contain bg-slate-50 rounded border border-slate-200"
-                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                  />
-                                )}
-                                <div className="flex-1">
-                                  <h5 className="font-bold text-slate-900 mb-1">
-                                    {result.markIdentification}
-                                  </h5>
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                                      <XCircle size={12} className="mr-1" />
-                                      {result.statusLabel || result.status}
-                                    </span>
-                                    <span className="text-xs text-red-600 font-semibold">
-                                      Active Conflict
-                                    </span>
-                                  </div>
-                                  <div className="text-sm text-slate-600">
-                                    <span className="font-semibold">Owner:</span> {result.owner}
-                                  </div>
-                                </div>
-                              </div>
-                              <a
-                                href={`https://tsdr.uspto.gov/#caseNumber=${result.serialNumber}&caseType=SERIAL_NO&searchType=statusSearch`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-700 flex items-center gap-1 text-xs font-medium flex-shrink-0"
-                              >
-                                View
-                                <ExternalLink size={12} />
-                              </a>
-                            </div>
-                          </div>
-                        ))}
-                        {activeMarks.length > 3 && (
-                          <p className="text-sm text-slate-600 italic">
-                            And {activeMarks.length - 3} more active trademark{activeMarks.length - 3 !== 1 ? 's' : ''}...
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="bg-amber-50 border-l-4 border-amber-500 rounded-r-lg p-4 mb-6">
-                        <p className="text-slate-700 text-sm">
-                          <span className="font-semibold">Note:</span> This search does not include pending applications. Additionally, the registered trademarks may not be registered in the same field or business type. We recommend an attorney search to make sure your business name is available.
-                        </p>
-                      </div>
-
-                      <div className="bg-white rounded-lg border-2 border-slate-300 p-6 space-y-4">
-                        <h4 className="font-bold text-slate-900 text-lg">Your Options:</h4>
-
-                        <div className="space-y-3">
-                          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                            <div className="flex items-start gap-3 mb-3">
-                              <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 font-bold text-sm">
-                                1
-                              </div>
-                              <div className="flex-1">
-                                <h5 className="font-semibold text-slate-900 mb-2">
-                                  Request a Professional Search ($49)
-                                </h5>
-                                <p className="text-sm text-slate-700 mb-3">
-                                  Our attorney will conduct a comprehensive search including federal, state, and common law trademarks, plus provide a detailed conflict analysis and recommendation.
-                                </p>
-                                <button
-                                  onClick={() => navigate('/trademark-search-request')}
-                                  className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors text-sm"
-                                >
-                                  Request Professional Search
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                            <div className="flex items-start gap-3">
-                              <div className="bg-amber-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 font-bold text-sm">
-                                2
-                              </div>
-                              <div className="flex-1">
-                                <h5 className="font-semibold text-slate-900 mb-2">
-                                  Continue with Your Application
-                                </h5>
-                                <p className="text-sm text-slate-700">
-                                  You can continue with your trademark application. Our comprehensive search (included in all packages) will provide a detailed analysis, and we'll contact you if we identify significant conflicts before filing.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-              })()}
             </div>
           )}
 

@@ -29,10 +29,10 @@ export default function TrademarkSearchChoicePage() {
                   </div>
                 </div>
                 <h2 className="text-3xl font-bold text-center mb-2">
-                  Search Yourself
+                  Free Search Request
                 </h2>
                 <p className="text-center text-blue-100 text-lg">
-                  Free DIY Search Tool
+                  Attorney-Conducted Search
                 </p>
               </div>
 
@@ -41,8 +41,8 @@ export default function TrademarkSearchChoicePage() {
                   <div className="flex items-start gap-3">
                     <Sparkles className="text-blue-500 flex-shrink-0 mt-1" size={20} />
                     <div>
-                      <div className="font-semibold text-slate-900">Instant Results</div>
-                      <div className="text-sm text-slate-600">Get immediate feedback on availability</div>
+                      <div className="font-semibold text-slate-900">Attorney Review</div>
+                      <div className="text-sm text-slate-600">Get professional search results</div>
                     </div>
                   </div>
 
