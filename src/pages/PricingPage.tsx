@@ -1,228 +1,327 @@
-import { Check, Shield, Zap, Crown, Eye, Package, DollarSign } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import {
+  Check, Shield, ArrowRight, Star, ChevronDown,
+  Clock, BadgeCheck, BarChart2, Lock, Zap, AlertCircle
+} from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import SchemaMarkup, { serviceSchema, faqSchema, organizationSchema, offerCatalogSchema } from '../components/SchemaMarkup';
-import FAQSection, { pricingFAQs } from '../components/FAQSection';
 import { ServicePackage } from '../lib/supabase';
 import { updatePageSEO, pageSEO } from '../utils/seo';
 
+const registrationFeatures = [
+  'Comprehensive trademark search (federal, state & common law)',
+  'USPTO application preparation by licensed attorney',
+  'Priority filing with expedited processing',
+  'Unlimited attorney support throughout the process',
+  'Application status monitoring & milestone alerts',
+  'Client portal — 24/7 case tracking',
+  'Post-approval guidance & certificate support',
+  'Amazon Brand Registry enrollment guide',
+];
+
+const additionalServices = [
+  {
+    name: 'Professional Trademark Search',
+    price: '$49',
+    note: 'One-time fee',
+    icon: BarChart2,
+    color: 'blue',
+    description: 'Comprehensive search with attorney analysis — federal, state, common law, domains, and social handles.',
+    route: '/trademark-search-request',
+    routeLabel: 'Request Search',
+  },
+  {
+    name: 'Trademark Monitoring',
+    price: '$149',
+    note: 'Per year',
+    icon: Shield,
+    color: 'emerald',
+    description: 'Annual watch service alerting you to potential conflicts with newly filed marks that could threaten your brand.',
+    route: null,
+    routeLabel: 'Add to Package',
+    pkg: 'Trademark Monitoring',
+  },
+  {
+    name: 'Cease & Desist Letter',
+    price: '$499',
+    note: 'Flat fee',
+    icon: BadgeCheck,
+    color: 'rose',
+    description: 'Attorney-drafted letter documenting your rights, detailing infringement, and demanding corrective action.',
+    route: '/cease-and-desist-request',
+    routeLabel: 'Get Started',
+  },
+  {
+    name: 'Procedural Office Action',
+    price: '$399',
+    note: 'Flat fee',
+    icon: AlertCircle,
+    color: 'amber',
+    description: 'Expert response to technical USPTO rejections — specimen issues, identification clarifications, etc.',
+    route: '/office-action-request',
+    routeLabel: 'Get Started',
+    routeState: { serviceType: 'Procedural Office Action Response' },
+  },
+  {
+    name: 'Substantive Office Action',
+    price: '$799',
+    note: 'Flat fee',
+    icon: Zap,
+    color: 'purple',
+    description: 'In-depth legal argument responding to likelihood of confusion, descriptiveness, or other substantive refusals.',
+    route: '/office-action-request',
+    routeLabel: 'Get Started',
+    routeState: { serviceType: 'Substantive Office Action Response' },
+  },
+];
+
+const faqs = [
+  {
+    question: 'What is included in the $499 trademark registration fee?',
+    answer: 'Everything: comprehensive trademark search (federal, state & common law), USPTO application preparation by a licensed attorney, priority filing, unlimited attorney support, application monitoring, client portal access, post-approval guidance, and an Amazon Brand Registry enrollment guide. The only separate cost is the required USPTO government filing fee of $350 per class.'
+  },
+  {
+    question: 'Are USPTO fees included in the $499 price?',
+    answer: 'No — the USPTO government filing fee of $350 per class is paid directly to the USPTO and is separate from our $499 attorney fee. Most brands register in one class, so the typical total is $849 (attorney fee + one class). Our attorneys will help you determine which classes apply.'
+  },
+  {
+    question: 'How many trademark classes do I need?',
+    answer: 'Most small businesses need just one class covering their primary goods or services. Each additional class costs $350 in additional USPTO filing fees. Our attorneys will advise you on the right classes before filing.'
+  },
+  {
+    question: 'How long does trademark registration take?',
+    answer: 'We file within 2–3 business days of receiving your information. USPTO examination typically takes 8–12 months. For Amazon Brand Registry, you can enroll as soon as your application is pending — your filing number is all you need.'
+  },
+  {
+    question: 'What if the USPTO sends an Office Action?',
+    answer: 'We monitor your application and alert you immediately. Office Action responses are available separately: $399 for procedural issues and $799 for substantive legal arguments. These are only required if the USPTO raises an issue.'
+  },
+  {
+    question: 'Do you offer payment plans?',
+    answer: 'Yes. We offer payment plans with a small 5% fee. You can select a payment plan during checkout when you get started.'
+  },
+  {
+    question: 'Is there a money-back guarantee?',
+    answer: 'We stand behind our work. If there is an error on our part in the preparation or filing of your application, we will correct it at no additional charge. Please contact us within 30 days if you have any concerns.'
+  },
+];
+
 export default function PricingPage() {
   const navigate = useNavigate();
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   useEffect(() => {
     updatePageSEO(pageSEO.pricing);
   }, []);
 
-  const handleGetStarted = (pkg: ServicePackage, needsAddOns: boolean) => {
-    if (pkg.name === 'Trademark Search') {
+  const handleGetStarted = (name: string, routeState?: object) => {
+    if (name === 'Professional Trademark Search') {
       navigate('/trademark-search-request');
-    } else if (pkg.name === 'Procedural Office Action Response' || pkg.name === 'Substantive Office Action Response') {
-      navigate('/office-action-request', { state: { serviceType: pkg.name } });
-    } else if (pkg.name === 'Cease and Desist Letter') {
+    } else if (name.includes('Office Action')) {
+      navigate('/office-action-request', { state: routeState });
+    } else if (name === 'Cease and Desist Letter') {
       navigate('/cease-and-desist-request');
     } else {
-      navigate('/get-started', { state: { package: pkg.name } });
+      navigate('/get-started', { state: { package: name } });
     }
   };
-  const packages = [
-    {
-      name: 'Trademark Registration Package',
-      price: '$499',
-      icon: Shield,
-      description: 'Complete trademark registration with comprehensive support',
-      features: [
-        'Comprehensive trademark search',
-        'Client Portal Access',
-        'USPTO application preparation & filing',
-        'Unlimited attorney support',
-        'Application monitoring',
-        'Post-approval guidance & certificate support',
-        'Priority filing - expedited processing',
-        'Amazon Brand Registry enrollment guide'
-      ],
-      cta: 'Get Started',
-      popular: true,
-      color: 'amber',
-      needsAddOns: true
-    }
+
+  const servicesSchemas = [
+    serviceSchema({ name: 'Trademark Registration Package', description: 'Complete professional trademark registration', price: '499', url: 'https://marqtrademarks.com/pricing' }),
   ];
-
-  const additionalServices = [
-    {
-      name: 'Trademark Monitoring',
-      price: '$149/year',
-      description: 'Annual monitoring service to watch for potential conflicts and protect your registered trademark from infringement',
-      needsAddOns: false
-    },
-    {
-      name: 'Cease and Desist Letter',
-      price: '$499',
-      description: 'Professional attorney-drafted letter to stop trademark infringement and protect your brand rights',
-      needsAddOns: false
-    },
-    {
-      name: 'Procedural Office Action Response',
-      price: '$399',
-      description: 'Response to technical issues like specimen problems or description clarifications',
-      needsAddOns: false
-    },
-    {
-      name: 'Substantive Office Action Response',
-      price: '$799',
-      description: 'Response to complex legal issues like likelihood of confusion or descriptiveness',
-      needsAddOns: false
-    }
-  ];
-
-  const faqs = [
-    {
-      question: 'What is included in the $499 Trademark Registration Package?',
-      answer: 'Our comprehensive $499 package includes everything you need for professional trademark registration: comprehensive trademark search, client portal access, USPTO application preparation and filing, unlimited attorney support, application monitoring, post-approval guidance and certificate support, priority filing with expedited processing, and Amazon Brand Registry enrollment guide. The USPTO filing fee of $350 per class is separate.'
-    },
-    {
-      question: 'Are USPTO fees included in the $499 price?',
-      answer: 'No, USPTO filing fees are separate from our attorney fees. Our attorney fee is $499, which covers all legal services. The USPTO requires a $350 filing fee per class, which is paid directly to the government. Each additional class requires an additional $350 USPTO filing fee.'
-    },
-    {
-      question: 'How many classes do I need?',
-      answer: 'Most businesses start with one class covering their primary goods or services. Our package is $499 plus the required USPTO filing fee of $350 per class. Each additional class requires an additional $350 USPTO filing fee. Our attorneys will help you determine which classes apply to your business during the consultation.'
-    },
-    {
-      question: 'How quickly will my application be filed?',
-      answer: 'Your application will be filed with priority processing, typically within 2-3 business days. Note that USPTO examination times are set by the government and typically take 8-12 months regardless of filing speed.'
-    },
-    {
-      question: 'Does this package work for Amazon Brand Registry?',
-      answer: 'Yes! Our package includes an Amazon Brand Registry enrollment guide and Amazon-specific documentation support. Amazon Brand Registry accepts filed pending trademark applications, so you can start enrollment immediately after your application is submitted to the USPTO.'
-    },
-    {
-      question: 'What if I receive an office action from the USPTO?',
-      answer: 'Office actions are additional legal work required if the USPTO raises issues with your application. Procedural office action responses (technical issues) are $399. Substantive office action responses (complex legal arguments about likelihood of confusion or descriptiveness) are $799. These are only needed if the USPTO issues an office action.'
-    },
-    {
-      question: 'Do you offer payment plans?',
-      answer: 'Yes! We offer flexible payment plans for our trademark registration package. Spread your investment over time with a small 5% fee. Payment plans are available during checkout.'
-    },
-    {
-      question: 'What is included in the Cease and Desist Letter service?',
-      answer: 'Our $499 cease and desist letter service includes a professionally drafted attorney letter documenting your intellectual property rights, detailing the infringement, citing relevant legal authorities, demanding specific action, and outlining potential consequences. We handle evidence gathering, strategic drafting, delivery, and initial follow-up communication.'
-    }
-  ];
-
-  const servicesSchemas = packages.map(pkg => serviceSchema({
-    name: pkg.name,
-    description: pkg.description,
-    price: pkg.price.replace('$', '').replace(',', ''),
-    url: `https://marqtrademarks.com/pricing#${pkg.name.toLowerCase()}`
-  }));
-
-  const faqSchemaData = faqSchema(faqs);
+  const faqSchemaData = faqSchema(faqs.map(f => ({ question: f.question, answer: f.answer })));
 
   return (
-    <div className="bg-white">
+    <div className="bg-white font-sans">
       <SchemaMarkup schema={[organizationSchema, offerCatalogSchema, ...servicesSchemas, faqSchemaData]} />
-      <section className="bg-gradient-to-br from-slate-900 to-slate-800 text-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6">Transparent, Flat-Fee Pricing</h1>
-          <p className="text-xl text-slate-300 max-w-2xl mx-auto">
-            Professional trademark services with clear pricing. No hourly billing, no surprises.
+
+      {/* ── HERO ── */}
+      <section className="relative bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white py-24 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(245,158,11,0.07),transparent_65%)]" />
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
+          <span className="inline-block bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-bold uppercase tracking-wider px-4 py-1.5 rounded-full mb-6">
+            Transparent Pricing
+          </span>
+          <h1 className="text-5xl md:text-6xl font-extrabold mb-6 font-display leading-tight">
+            Flat-fee trademark protection.<br />
+            <span className="bg-gradient-to-r from-amber-400 to-amber-300 bg-clip-text text-transparent">
+              No surprises. Ever.
+            </span>
+          </h1>
+          <p className="text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed mb-8">
+            One clear price covers real attorney service from search to registration. Compare us to anyone — our value wins.
           </p>
+          <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-slate-400">
+            {['Real USPTO attorneys', 'No hourly billing', 'All 50 states', '5-star rated'].map(t => (
+              <div key={t} className="flex items-center gap-2">
+                <Check size={14} className="text-emerald-400" />
+                {t}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
+      {/* ── MAIN PACKAGE ── */}
       <section className="py-20 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-16 max-w-4xl mx-auto">
-            <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-2xl p-8 shadow-xl">
-              <div className="flex items-start gap-4">
-                <div className="bg-amber-500 rounded-xl p-3 flex-shrink-0">
-                  <DollarSign className="text-white" size={28} />
-                </div>
-                <div className="flex-grow">
-                  <h3 className="text-2xl font-bold text-slate-900 mb-3">We Proudly Offer Payment Plans</h3>
-                  <p className="text-slate-700 text-lg leading-relaxed mb-4">
-                    Make trademark protection more accessible with our flexible payment plan options. Spread your investment over time with a small 5% fee.
-                  </p>
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <Check className="text-green-600 flex-shrink-0" size={20} />
-                    <span className="font-medium">Available for all trademark registration packages</span>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+
+            {/* Package card */}
+            <div className="lg:col-span-3 relative">
+              <div className="absolute -inset-1 bg-gradient-to-br from-amber-400/30 to-amber-600/20 rounded-3xl blur-xl" />
+              <div className="relative bg-white rounded-2xl border-2 border-amber-400 shadow-2xl overflow-hidden">
+                <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-8 py-4 flex items-center justify-between">
+                  <span className="text-slate-900 font-bold text-sm uppercase tracking-wide">Most Popular</span>
+                  <div className="flex gap-0.5">
+                    {[...Array(5)].map((_, i) => <Star key={i} size={14} className="text-slate-900 fill-slate-900" />)}
                   </div>
+                </div>
+                <div className="p-8 md:p-10">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center">
+                      <Shield size={28} className="text-amber-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-slate-900">Trademark Registration</h2>
+                      <p className="text-slate-500 text-sm">Complete package by real attorneys</p>
+                    </div>
+                  </div>
+
+                  <div className="mb-8">
+                    <div className="flex items-end gap-2 mb-1">
+                      <span className="text-6xl font-black text-slate-900">$499</span>
+                      <span className="text-slate-500 mb-2 text-sm">attorney fee</span>
+                    </div>
+                    <p className="text-slate-500 text-sm">+ $350 USPTO government filing fee per class</p>
+                  </div>
+
+                  <ul className="space-y-3.5 mb-8">
+                    {registrationFeatures.map(f => (
+                      <li key={f} className="flex items-start gap-3">
+                        <div className="w-5 h-5 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <Check size={11} className="text-emerald-600" strokeWidth={3} />
+                        </div>
+                        <span className="text-slate-700 text-sm">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    onClick={() => navigate('/get-started')}
+                    className="group w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-900 py-4 rounded-xl font-bold text-lg hover:from-amber-400 hover:to-amber-500 transition-all shadow-lg hover:shadow-amber-300/50 hover:scale-[1.01]"
+                  >
+                    Get Started — $499
+                    <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                  <p className="text-xs text-slate-400 text-center mt-3">
+                    Payment plans available · Secure checkout
+                  </p>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex justify-center px-4">
-            {packages.map((pkg, index) => (
-              <div
-                key={index}
-                className="bg-white rounded-2xl shadow-lg border-2 border-amber-500 relative p-6 sm:p-8 md:p-10 flex flex-col max-w-xl w-full"
-              >
-                <div className="absolute -top-3 sm:-top-4 left-1/2 transform -translate-x-1/2 px-2">
-                  <span className="bg-amber-500 text-white px-3 sm:px-4 md:px-6 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm md:text-base font-semibold whitespace-nowrap">
-                    Professional Package
-                  </span>
-                </div>
-                <div className="mb-6 sm:mb-8 text-center">
-                  <pkg.icon className="text-amber-600 mb-4 sm:mb-6 mx-auto" size={48} />
-                  <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 mb-3 sm:mb-4 whitespace-nowrap">Trademark Registration</h3>
-                  <div className="text-4xl sm:text-5xl font-bold text-slate-900 mb-2 sm:mb-3">
-                    {pkg.price}
-                  </div>
-                  <p className="text-slate-600 text-sm sm:text-base">{pkg.description}</p>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-2">Plus USPTO filing fee ($350 per class)</p>
-                </div>
-
-                <ul className="space-y-3 sm:space-y-4 mb-8 sm:mb-10 flex-grow">
-                  {pkg.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-start gap-2 sm:gap-3">
-                      <Check className="text-green-500 flex-shrink-0 mt-0.5" size={20} />
-                      <span className="text-slate-700 text-sm sm:text-base">{feature}</span>
-                    </li>
+            {/* Side info */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <Clock size={18} className="text-amber-500" />
+                  Timeline
+                </h3>
+                <div className="space-y-3 text-sm">
+                  {[
+                    { label: 'Filing within', val: '2–3 business days' },
+                    { label: 'USPTO review', val: '8–12 months' },
+                    { label: 'Amazon Brand Registry', val: 'Immediately upon filing' },
+                  ].map(({ label, val }) => (
+                    <div key={label} className="flex justify-between">
+                      <span className="text-slate-500">{label}</span>
+                      <span className="font-semibold text-slate-800">{val}</span>
+                    </div>
                   ))}
-                </ul>
-
-                <button
-                  onClick={() => handleGetStarted({ name: pkg.name, price: pkg.price, description: pkg.description }, pkg.needsAddOns)}
-                  className="w-full py-3 sm:py-4 rounded-lg font-semibold transition-all text-base sm:text-lg bg-amber-500 text-white hover:bg-amber-600 shadow-md hover:shadow-xl"
-                >
-                  {pkg.cta}
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-12 text-center">
-            <p className="text-slate-600 mb-4">
-              Available in all 50 states • Federal trademark protection • Expert legal team
-            </p>
-            <p className="text-sm text-slate-500">
-              Plus required USPTO filing fee of $350 per class • Add-on: Additional Classes ($350 USPTO fee per class)
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Additional Services</h2>
-            <p className="text-xl text-slate-600">À la carte options to customize your trademark protection</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            {additionalServices.map((service, index) => (
-              <div key={index} className="bg-white border-2 border-slate-200 rounded-xl p-6 shadow-sm hover:border-amber-400 transition-colors flex flex-col">
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-lg font-bold text-slate-900 flex-grow pr-3">{service.name}</h3>
-                  <span className="text-2xl font-bold text-slate-900 flex-shrink-0">{service.price}</span>
                 </div>
-                <p className="text-slate-600 mb-4 flex-grow">{service.description}</p>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <Lock size={18} className="text-emerald-500" />
+                  Payment Plans Available
+                </h3>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Split your payment over time with our flexible plan option. A small 5% plan fee applies. Select during checkout.
+                </p>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
+                <h3 className="font-bold text-amber-900 mb-2 flex items-center gap-2">
+                  <BadgeCheck size={18} className="text-amber-600" />
+                  Amazon Sellers
+                </h3>
+                <p className="text-sm text-amber-800 leading-relaxed">
+                  Your pending application qualifies you for Amazon Brand Registry immediately — no waiting for approval.
+                </p>
+                <Link to="/amazon" className="text-amber-700 text-xs font-semibold mt-2 inline-flex items-center gap-1 hover:text-amber-800 transition-colors">
+                  Learn more <ArrowRight size={12} />
+                </Link>
+              </div>
+
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  {[...Array(5)].map((_, i) => <Star key={i} size={14} className="text-amber-400 fill-amber-400" />)}
+                </div>
+                <p className="text-sm text-emerald-900 leading-relaxed font-medium">
+                  "Mary and her team filed my trademark quickly and kept me informed every step of the way. Worth every penny."
+                </p>
+                <div className="text-xs text-emerald-700 mt-2 font-semibold">— Sarah M., Business Owner</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── ADDITIONAL SERVICES ── */}
+      <section className="py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <span className="inline-block bg-slate-100 text-slate-600 text-xs font-bold uppercase tracking-wider px-4 py-1.5 rounded-full mb-4">
+              À La Carte Services
+            </span>
+            <h2 className="text-4xl font-bold text-slate-900 font-display mb-4">
+              Additional protection options
+            </h2>
+            <p className="text-slate-500 max-w-2xl mx-auto">
+              Customize your trademark protection with standalone services, or add them to your registration package.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {additionalServices.map(({ name, price, note, icon: Icon, color, description, route, routeLabel, routeState, pkg }) => (
+              <div
+                key={name}
+                className={`group bg-white rounded-2xl border border-slate-200 hover:border-${color}-300 p-6 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 flex flex-col`}
+              >
+                <div className={`w-12 h-12 bg-${color}-50 border border-${color}-100 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                  <Icon size={22} className={`text-${color}-600`} />
+                </div>
+                <div className="flex items-end justify-between mb-3">
+                  <h3 className="font-bold text-slate-900 text-base leading-tight pr-2">{name}</h3>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-2xl font-black text-slate-900">{price}</div>
+                    <div className="text-xs text-slate-400">{note}</div>
+                  </div>
+                </div>
+                <p className="text-slate-500 text-sm leading-relaxed flex-grow mb-5">{description}</p>
                 <button
-                  onClick={() => handleGetStarted({ name: service.name, price: service.price, description: service.description }, service.needsAddOns)}
-                  className="w-full bg-slate-800 text-white py-3 rounded-lg font-semibold hover:bg-slate-700 transition-all mt-auto"
+                  onClick={() => {
+                    if (route) {
+                      navigate(route, routeState ? { state: routeState } : undefined);
+                    } else {
+                      navigate('/get-started', { state: { package: pkg } });
+                    }
+                  }}
+                  className={`w-full py-2.5 rounded-xl font-semibold text-sm transition-all border-2 border-${color}-200 text-${color}-700 hover:bg-${color}-50 hover:border-${color}-400`}
                 >
-                  Get Started
+                  {routeLabel}
                 </button>
               </div>
             ))}
@@ -230,19 +329,98 @@ export default function PricingPage() {
         </div>
       </section>
 
-      <FAQSection faqs={pricingFAQs} title="Pricing Questions" />
-
-      <section className="py-20 bg-gradient-to-br from-slate-900 to-slate-800 text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Protect Your Brand?</h2>
-          <p className="text-xl text-slate-300 mb-8">
-            Get started with our comprehensive trademark registration package today.
+      {/* ── TOTAL COST BREAKDOWN ── */}
+      <section className="py-16 bg-slate-50">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-bold text-slate-900 font-display text-center mb-10">
+            What you'll actually pay
+          </h2>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            {[
+              { label: 'Attorney fee (registration package)', amount: '$499', note: 'Everything listed above' },
+              { label: 'USPTO filing fee — 1 class', amount: '$350', note: 'Paid to U.S. government' },
+              { label: 'Each additional class', amount: '$350', note: 'Per extra class, if applicable' },
+            ].map((row, i) => (
+              <div key={row.label} className={`flex items-center justify-between px-6 py-5 ${i < 2 ? 'border-b border-slate-100' : ''}`}>
+                <div>
+                  <div className="font-semibold text-slate-900 text-sm">{row.label}</div>
+                  <div className="text-xs text-slate-400 mt-0.5">{row.note}</div>
+                </div>
+                <div className="text-xl font-bold text-slate-900">{row.amount}</div>
+              </div>
+            ))}
+            <div className="bg-amber-50 border-t-2 border-amber-200 flex items-center justify-between px-6 py-5">
+              <div>
+                <div className="font-bold text-slate-900">Typical total (1 class)</div>
+                <div className="text-xs text-slate-500 mt-0.5">Attorney fee + USPTO fee</div>
+              </div>
+              <div className="text-3xl font-black text-amber-700">$849</div>
+            </div>
+          </div>
+          <p className="text-xs text-slate-400 text-center mt-4">
+            No hidden charges. No hourly billing. No surprises.
           </p>
-          <button onClick={() => navigate('/get-started')} className="bg-amber-500 text-slate-900 px-8 py-4 rounded-lg font-semibold hover:bg-amber-400 transition-all hover:scale-105 shadow-lg">
-            Start Your Application
-          </button>
-          <p className="text-sm text-slate-400 mt-6">
-            Questions? Contact us at contact@marqtrademarks.com
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section className="py-20 bg-white">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <span className="inline-block bg-slate-100 text-slate-600 text-xs font-bold uppercase tracking-wider px-4 py-1.5 rounded-full mb-4">FAQ</span>
+            <h2 className="text-4xl font-bold text-slate-900 font-display">Pricing questions</h2>
+          </div>
+          <div className="space-y-3">
+            {faqs.map(({ question, answer }, i) => (
+              <div key={i} className="border border-slate-200 rounded-2xl overflow-hidden hover:border-amber-200 transition-colors">
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  className="w-full flex items-center justify-between px-6 py-5 text-left"
+                >
+                  <span className="font-semibold text-slate-900 pr-4 text-sm">{question}</span>
+                  <ChevronDown
+                    size={18}
+                    className={`text-slate-400 flex-shrink-0 transition-transform duration-200 ${openFaq === i ? 'rotate-180 text-amber-500' : ''}`}
+                  />
+                </button>
+                {openFaq === i && (
+                  <div className="px-6 pb-5">
+                    <p className="text-slate-600 text-sm leading-relaxed">{answer}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FINAL CTA ── */}
+      <section className="py-20 bg-gradient-to-br from-slate-950 to-slate-800 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(245,158,11,0.07),transparent_65%)]" />
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
+          <h2 className="text-4xl md:text-5xl font-bold font-display mb-6">
+            Ready to register your trademark?
+          </h2>
+          <p className="text-xl text-slate-300 mb-10 leading-relaxed">
+            Start today — flat $499 attorney fee, real USPTO attorneys, no hidden costs.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={() => navigate('/get-started')}
+              className="group flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-900 px-10 py-4 rounded-xl font-bold text-lg hover:from-amber-400 hover:to-amber-500 transition-all shadow-xl hover:scale-[1.02]"
+            >
+              Get Started — $499
+              <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+            <button
+              onClick={() => navigate('/trademark-search-request')}
+              className="flex items-center justify-center gap-2 bg-white/10 border border-white/20 text-white px-10 py-4 rounded-xl font-semibold text-lg hover:bg-white/15 transition-all"
+            >
+              Start with Free Search
+            </button>
+          </div>
+          <p className="text-slate-500 text-sm mt-6">
+            Questions? <a href="mailto:contact@marqtrademarks.com" className="text-amber-400 hover:text-amber-300 transition-colors">contact@marqtrademarks.com</a>
           </p>
         </div>
       </section>
