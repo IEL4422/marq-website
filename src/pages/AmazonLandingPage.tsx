@@ -1,4 +1,4 @@
-import { Shield, CheckCircle, ArrowRight, FileSearch, Package, Lock, Star, TrendingUp, Zap, AlertCircle } from 'lucide-react';
+import { CheckCircle, ArrowRight, FileSearch, Package, Lock, Star, TrendingUp, Zap, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import SchemaMarkup, { organizationSchema, websiteSchema, offerCatalogSchema } from '../components/SchemaMarkup';
@@ -13,9 +13,7 @@ export default function AmazonLandingPage() {
       title: 'Amazon Brand Registry Trademark Registration | Fast Federal Trademark for Sellers | Marq Legal',
       description: 'File your federal trademark and start Amazon Brand Registry enrollment immediately with your pending application. Protect your brand, stop hijackers, and access Brand Registry tools. Expert trademark registration starting at $499 with priority filing for Amazon sellers.',
       keywords: 'amazon brand registry, amazon trademark, amazon seller trademark, federal trademark amazon, brand registry trademark, amazon brand protection, trademark for amazon sellers, pending trademark application',
-      ogTitle: 'Amazon Brand Registry Trademark Registration | Fast Federal Trademark',
-      ogDescription: 'Start Amazon Brand Registry enrollment with your pending trademark application. Protect your brand, stop hijackers, and access Brand Registry protection immediately after filing. Expert service for Amazon sellers.',
-      canonical: 'https://marqtrademarks.com/amazon'
+canonical: 'https://marqtrademarks.com/amazon'
     });
   }, []);
 

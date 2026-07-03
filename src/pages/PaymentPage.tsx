@@ -3,7 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Check, Lock } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
-import { ServicePackage, supabase } from '../lib/supabase';
+import { payments } from '../lib/api';
+
+interface ServicePackage { name: string; price: string; description: string; }
 import StripePaymentForm from '../components/StripePaymentForm';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -16,13 +18,13 @@ export default function PaymentPage() {
   const agreementIdFromUrl = urlParams.get('agreementId');
   const emailFromUrl = urlParams.get('email');
 
-  const [selectedPackage, setSelectedPackage] = useState<ServicePackage | undefined>(
+  const [selectedPackage] = useState<ServicePackage | undefined>(
     location.state?.selectedPackage as ServicePackage | undefined
   );
-  const [clientEmail, setClientEmail] = useState<string | undefined>(
+  const [clientEmail] = useState<string | undefined>(
     location.state?.clientEmail || emailFromUrl || undefined
   );
-  const [agreementId, setAgreementId] = useState<string | undefined>(
+  const [agreementId] = useState<string | undefined>(
     location.state?.agreementId || agreementIdFromUrl || undefined
   );
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -38,40 +40,12 @@ export default function PaymentPage() {
     urlParams: { agreementIdFromUrl, emailFromUrl }
   });
 
+  // Agreement data comes from navigation state; fallback redirects to start
   useEffect(() => {
-    const loadAgreementData = async () => {
-      if (!selectedPackage && agreementId) {
-        console.log('Fetching agreement data from database...');
-        try {
-          const { data: agreementData, error: fetchError } = await supabase
-            .from('client_agreements')
-            .select('*')
-            .eq('id', agreementId)
-            .maybeSingle();
-
-          if (fetchError || !agreementData) {
-            console.error('Failed to fetch agreement:', fetchError);
-            navigate('/get-started');
-            return;
-          }
-
-          console.log('Agreement data fetched:', agreementData);
-          setSelectedPackage({
-            name: agreementData.package_name,
-            price: agreementData.package_price,
-            description: agreementData.package_name
-          });
-          setClientEmail(agreementData.client_email);
-        } catch (err) {
-          console.error('Error loading agreement:', err);
-          navigate('/get-started');
-          return;
-        }
-      }
-    };
-
-    loadAgreementData();
-  }, [agreementId, selectedPackage, navigate]);
+    if (!selectedPackage && !agreementId) {
+      navigate('/get-started');
+    }
+  }, [selectedPackage, agreementId, navigate]);
 
   useEffect(() => {
     if (!selectedPackage) {
@@ -107,39 +81,14 @@ export default function PaymentPage() {
           agreementId: agreementId || null,
         });
 
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-payment-intent`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            },
-            body: JSON.stringify({
-              amount,
-              currency: 'usd',
-              clientEmail: clientEmail || 'guest@example.com',
-              agreementId: agreementId || null,
-              paymentMethodType: 'card',
-            }),
-          }
-        );
+        const data = await payments.createIntent({
+          amount,
+          clientEmail: clientEmail || 'guest@example.com',
+          clientName: location.state?.clientName,
+          packageName: selectedPackage.name,
+        });
 
-        const data = await response.json();
-        console.log('Payment intent response:', { ok: response.ok, status: response.status, data });
-
-        if (!response.ok) {
-          const errorMessage = data.error || `Failed to create payment intent (${response.status})`;
-          console.error('Payment intent error:', errorMessage);
-          throw new Error(errorMessage);
-        }
-
-        if (!data.clientSecret) {
-          console.error('No client secret in response:', data);
-          throw new Error('Invalid payment response - missing client secret');
-        }
-
-        console.log('Payment intent created successfully');
+        if (!data.clientSecret) throw new Error('Invalid payment response - missing client secret');
         setClientSecret(data.clientSecret);
       } catch (err) {
         console.error('Error in createPaymentIntent:', err);
@@ -154,25 +103,17 @@ export default function PaymentPage() {
 
   const handlePaymentSuccess = async () => {
     try {
-      await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-purchase-webhook`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            agreementId: agreementId || null,
-            clientEmail: clientEmail || 'guest@example.com',
-            packageName: selectedPackage.name,
-          }),
-        }
-      );
-    } catch (err) {
-      console.error('Failed to send purchase webhook:', err);
+      await fetch('/api/notifications/zapier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventType: 'payment_completed',
+          data: { clientEmail, packageName: selectedPackage?.name, agreementId },
+        }),
+      });
+    } catch {
+      // non-critical
     }
-
     navigate('/confirmation');
   };
 

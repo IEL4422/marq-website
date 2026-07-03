@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
 import TrademarkIntakeForm from '../components/TrademarkIntakeForm';
-import { supabase } from '../lib/supabase';
+import { matters } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function TrademarkIntakeFormPage() {
@@ -24,23 +24,17 @@ export default function TrademarkIntakeFormPage() {
 
   const loadMatter = async () => {
     try {
-      const { data, error } = await supabase
-        .from('trademark_matters')
-        .select('*')
-        .eq('id', matterId)
-        .eq('client_id', user?.id)
-        .maybeSingle();
+      const allMatters = await matters.myMatters();
+      const found = allMatters.find((m: any) => m._id === matterId);
 
-      if (error) throw error;
-
-      if (!data) {
+      if (!found) {
         navigate('/client-portal');
         return;
       }
 
-      setMatter(data);
+      setMatter(found);
 
-      if (data.intake_completed_at) {
+      if ((found as any).intakeCompletedAt) {
         setSubmitted(true);
       }
     } catch (error) {

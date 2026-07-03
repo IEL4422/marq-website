@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, Check, Loader2, AlertCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { contact } from '../lib/api';
 import { notifyCeaseAndDesistRequest } from '../utils/notifications';
 
 interface FormData {
@@ -50,35 +50,6 @@ export default function CeaseAndDesistIntakePage() {
     }
   };
 
-  const uploadFile = async (file: File): Promise<string | null> => {
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `cease-desist-logo-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-      const filePath = `cease-desist-logos/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('trademark-logos')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('Error uploading file:', uploadError);
-        throw uploadError;
-      }
-
-      const { data } = supabase.storage
-        .from('trademark-logos')
-        .getPublicUrl(filePath);
-
-      return data.publicUrl;
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      throw new Error(`Failed to upload ${file.name}: ${error.message || 'Unknown error'}`);
-    }
-  };
-
   const validateForm = (): boolean => {
     return !!(
       formData.fullName &&
@@ -107,38 +78,18 @@ export default function CeaseAndDesistIntakePage() {
     setError('');
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      let logoUrl: string | null = null;
-      if (formData.logoFile) {
-        try {
-          logoUrl = await uploadFile(formData.logoFile);
-        } catch (err: any) {
-          throw new Error(`Logo upload failed: ${err.message}`);
-        }
-      }
-
-      const { data: requestData, error: insertError } = await supabase
-        .from('cease_and_desist_requests')
-        .insert({
-          user_id: user?.id || null,
-          full_name: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
-          trademark_name: formData.trademarkName,
-          logo_url: logoUrl,
-          trademark_filed_date: formData.trademarkFiledDate,
-          trademark_accepted_date: formData.trademarkAcceptedDate || null,
-          infringer_name: formData.infringerName,
-          infringer_contact: formData.infringerContact || null,
-          infringement_description: formData.infringementDescription,
-          desired_outcome: formData.desiredOutcome,
-          additional_info: formData.additionalInfo || null
-        })
-        .select()
-        .single();
-
-      if (insertError) throw new Error(`Database error: ${insertError.message}`);
+      await contact.submit({
+        fullName: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        trademarkName: formData.trademarkName,
+        infringerName: formData.infringerName,
+        infringerContact: formData.infringerContact || '',
+        infringementDescription: formData.infringementDescription,
+        desiredOutcome: formData.desiredOutcome,
+        additionalInfo: formData.additionalInfo || '',
+        message: `Cease and Desist Request - Infringer: ${formData.infringerName}`
+      });
 
       await notifyCeaseAndDesistRequest(
         formData.fullName,
@@ -146,7 +97,7 @@ export default function CeaseAndDesistIntakePage() {
         formData.trademarkName,
         formData.phone,
         formData.infringerName,
-        requestData.id
+        ''
       ).catch(err => console.error('Notification error:', err));
 
       navigate('/agreement', {
@@ -156,7 +107,7 @@ export default function CeaseAndDesistIntakePage() {
             price: '$499',
             description: 'Professional attorney-drafted letter to stop trademark infringement and protect your brand rights'
           },
-          requestId: requestData.id,
+          requestId: null,
           requestType: 'cease_and_desist'
         }
       });

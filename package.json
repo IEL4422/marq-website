@@ -1,10 +1,11 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "marq-legal-website",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "cd server && node server.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -13,8 +14,6 @@
   "dependencies": {
     "@stripe/react-stripe-js": "^5.4.1",
     "@stripe/stripe-js": "^8.5.3",
-    "@supabase/supabase-js": "^2.57.4",
-    "dotenv": "^17.2.3",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -108,28 +108,6 @@ export default function BusinessNameGeneratorPage() {
     }
   };
 
-  const styleModifiers: Record<string, { approach: string[], modifiers: string[] }> = {
-    'modern': {
-      approach: ['minimal', 'tech', 'sleek'],
-      modifiers: ['io', 'ly', 'ify', 'zy', 'ix', 'ex']
-    },
-    'classic': {
-      approach: ['traditional', 'formal', 'established'],
-      modifiers: ['& Co', 'Group', 'Associates', 'Partners', 'House of']
-    },
-    'creative': {
-      approach: ['unique', 'playful', 'inventive'],
-      modifiers: ['lab', 'studio', 'collective', 'works', 'forge']
-    },
-    'professional': {
-      approach: ['corporate', 'formal', 'authoritative'],
-      modifiers: ['Consulting', 'Solutions', 'Enterprises', 'Corporation', 'International']
-    },
-    'fun': {
-      approach: ['playful', 'energetic', 'vibrant'],
-      modifiers: ['Box', 'Pop', 'Buzz', 'Zest', 'Spark']
-    }
-  };
 
   const generateCreativeBlend = (word1: string, word2: string): string => {
     const len1 = word1.length;
@@ -151,9 +129,7 @@ export default function BusinessNameGeneratorPage() {
       }
 
       const patterns = industryPatterns[industry] || industryPatterns['Technology'];
-      const styleConfig = styleModifiers[style] || styleModifiers['modern'];
-
-      keywordList.forEach((keyword, keywordIndex) => {
+keywordList.forEach((keyword, keywordIndex) => {
         const capitalizedKeyword = keyword.charAt(0).toUpperCase() + keyword.slice(1);
 
         if (style === 'modern') {
@@ -275,7 +251,9 @@ export default function BusinessNameGeneratorPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <SchemaMarkup type="WebPage" data={{
+      <SchemaMarkup schema={{
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
         name: 'Business Name Generator - Marq',
         description: 'Generate unique business names and check trademark availability. Free business name generator tool for entrepreneurs and startups.'
       }} />

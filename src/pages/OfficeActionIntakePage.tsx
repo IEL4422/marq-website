@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Upload, Check, Loader2, AlertCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { contact } from '../lib/api';
 import { notifyOfficeActionRequest } from '../utils/notifications';
 
 interface FormData {
@@ -41,35 +41,6 @@ export default function OfficeActionIntakePage() {
     }
   };
 
-  const uploadFile = async (file: File, bucket: string, prefix: string): Promise<string | null> => {
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${prefix}-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-      const filePath = `${prefix}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('Error uploading file:', uploadError);
-        throw uploadError;
-      }
-
-      const { data } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(filePath);
-
-      return data.publicUrl;
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      throw new Error(`Failed to upload ${file.name}: ${error.message || 'Unknown error'}`);
-    }
-  };
-
   const validateForm = (): boolean => {
     return !!(
       formData.fullName &&
@@ -100,44 +71,14 @@ export default function OfficeActionIntakePage() {
     setError('');
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      let logoUrl: string | null = null;
-      if (formData.logoFile) {
-        try {
-          logoUrl = await uploadFile(formData.logoFile, 'trademark-logos', 'office-action-logos');
-        } catch (err: any) {
-          throw new Error(`Logo upload failed: ${err.message}`);
-        }
-      }
-
-      let officeActionUrl: string | null = null;
-      try {
-        officeActionUrl = await uploadFile(formData.officeActionFile!, 'trademark-logos', 'office-actions');
-      } catch (err: any) {
-        throw new Error(`Office action upload failed: ${err.message}`);
-      }
-
-      if (!officeActionUrl) {
-        throw new Error('Failed to upload office action file');
-      }
-
-      const { data: requestData, error: insertError } = await supabase
-        .from('office_action_requests')
-        .insert({
-          user_id: user?.id || null,
-          full_name: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
-          trademark_name: formData.trademarkName,
-          service_type: serviceType,
-          logo_url: logoUrl,
-          office_action_url: officeActionUrl
-        })
-        .select()
-        .single();
-
-      if (insertError) throw new Error(`Database error: ${insertError.message}`);
+      await contact.submit({
+        fullName: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        trademarkName: formData.trademarkName,
+        serviceType,
+        message: `Office Action Response Request - Service: ${serviceType}`
+      });
 
       await notifyOfficeActionRequest(
         formData.fullName,
@@ -145,7 +86,7 @@ export default function OfficeActionIntakePage() {
         formData.trademarkName,
         formData.phone,
         serviceType,
-        requestData.id
+        ''
       ).catch(err => console.error('Notification error:', err));
 
       navigate('/agreement', {
@@ -157,7 +98,7 @@ export default function OfficeActionIntakePage() {
               ? 'Response to technical issues like specimen problems or description clarifications'
               : 'Response to complex legal issues like likelihood of confusion or descriptiveness'
           },
-          requestId: requestData.id,
+          requestId: null,
           requestType: 'office_action'
         }
       });

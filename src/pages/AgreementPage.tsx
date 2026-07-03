@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Check, Calendar } from 'lucide-react';
-import { supabase, ServicePackage } from '../lib/supabase';
+import { agreements } from '../lib/api';
 import SignaturePad from '../components/SignaturePad';
+
+interface ServicePackage { name: string; price: string; description: string; }
 
 export default function AgreementPage() {
   const navigate = useNavigate();
@@ -57,67 +59,26 @@ export default function AgreementPage() {
     setError('');
 
     try {
-      console.log('Submitting agreement...', {
-        client_name: clientName,
-        client_email: clientEmail,
-        package_name: selectedPackage.name
+      const result = await agreements.create({
+        clientName,
+        clientEmail,
+        clientCompany: clientCompany || undefined,
+        packageName: selectedPackage!.name,
+        packagePrice: selectedPackage!.price,
+        signatureType,
+        signatureData: signature,
+        addOns: location.state?.selectedAddOns || [],
       });
 
-      console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-      console.log('Anon Key present:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
-
-      const { data, error: insertError } = await supabase
-        .from('client_agreements')
-        .insert({
-          client_name: clientName,
-          client_email: clientEmail,
-          client_company: clientCompany || null,
-          package_name: selectedPackage.name,
-          package_price: selectedPackage.price,
-          signature_type: signatureType,
-          signature_data: signature,
-          signed_date: signedDate
-        })
-        .select()
-        .maybeSingle();
-
-      console.log('Insert completed. Result:', { data, insertError });
-
-      if (insertError) {
-        console.error('Insert error details:', insertError);
-        throw new Error(insertError.message || 'Failed to save agreement');
-      }
-
-      if (!data) {
-        console.error('No data returned from insert');
-        throw new Error('Failed to create agreement record - no data returned');
-      }
-
-      console.log('Agreement saved successfully. ID:', data.id);
-      console.log('Navigating to payment page...');
-
-      const navigationState = {
-        selectedPackage,
-        agreementId: data.id,
-        clientEmail,
-        clientName,
-        selectedAddOns: location.state?.selectedAddOns || []
-      };
-
-      console.log('Navigation state:', navigationState);
-
-      setTimeout(() => {
-        try {
-          navigate('/payment-method-selection', {
-            state: navigationState,
-            replace: false
-          });
-          console.log('Navigation initiated');
-        } catch (navError) {
-          console.error('Navigation error:', navError);
-          window.location.href = `/payment-method-selection?agreementId=${data.id}&email=${encodeURIComponent(clientEmail)}`;
-        }
-      }, 100);
+      navigate('/payment-method-selection', {
+        state: {
+          selectedPackage,
+          agreementId: result.id,
+          clientEmail,
+          clientName,
+          selectedAddOns: location.state?.selectedAddOns || [],
+        },
+      });
 
     } catch (err) {
       console.error('Error saving agreement:', err);

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, CheckCircle, Upload, X, Lock } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { searchRequests, payments } from '../lib/api';
 import { updatePageSEO, pageSEO } from '../utils/seo';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
@@ -65,29 +65,10 @@ export default function TrademarkSearchRequestPage() {
     try {
       const amount = 4900;
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-payment-intent`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            amount,
-            currency: 'usd',
-            clientEmail: formData.email,
-            agreementId: null,
-            paymentMethodType: 'card',
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create payment intent');
-      }
+      const data = await payments.createIntent({
+        amount,
+        clientEmail: formData.email,
+      });
 
       if (!data.clientSecret) {
         throw new Error('Invalid payment response');
@@ -105,50 +86,20 @@ export default function TrademarkSearchRequestPage() {
 
   const handlePaymentSuccess = async () => {
     try {
-      let logoUrl = formData.logoUrl;
+      await searchRequests.create({
+        trademarkName: formData.trademarkName,
+        clientName: formData.fullName,
+        clientEmail: formData.email,
+        businessDescription: formData.businessDescription
+      });
 
-      if (logoFile) {
-        const fileExt = logoFile.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('trademark-logos')
-          .upload(filePath, logoFile);
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from('trademark-logos')
-          .getPublicUrl(filePath);
-
-        logoUrl = urlData.publicUrl;
-      }
-
-      const { data: requestData, error: submitError } = await supabase
-        .from('trademark_search_requests')
-        .insert([
-          {
-            full_name: formData.fullName,
-            email: formData.email,
-            trademark_name: formData.trademarkName,
-            logo_url: logoUrl || null,
-            business_description: formData.businessDescription
-          }
-        ])
-        .select();
-
-      if (submitError) throw submitError;
-
-      if (requestData && requestData[0]) {
-        await notifyTrademarkSearchRequest(
-          formData.fullName,
-          formData.email,
-          formData.trademarkName,
-          formData.businessDescription,
-          requestData[0].id
-        ).catch(err => console.error('Notification error:', err));
-      }
+      await notifyTrademarkSearchRequest(
+        formData.fullName,
+        formData.email,
+        formData.trademarkName,
+        formData.businessDescription,
+        ''
+      ).catch(err => console.error('Notification error:', err));
 
       setSubmitted(true);
     } catch (err) {
@@ -298,11 +249,10 @@ export default function TrademarkSearchRequestPage() {
                 <span className="text-sm">Secure payment processed by Stripe</span>
               </div>
 
-              <Elements stripe={stripePromise} options={{ clientSecret }}>
+              <Elements stripe={stripePromise} options={{ clientSecret: clientSecret! }}>
                 <StripePaymentForm
-                  clientSecret={clientSecret}
                   onSuccess={handlePaymentSuccess}
-                  amount={49}
+                  onError={(msg) => setError(msg)}
                 />
               </Elements>
             </div>

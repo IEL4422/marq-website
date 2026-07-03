@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Clock, Calendar, ArrowLeft, Tag } from 'lucide-react';
-import { supabase, BlogPost } from '../lib/supabase';
+import { blog, BlogPost } from '../lib/api';
 import { formatBlogContent } from '../utils/formatContent';
 import SchemaMarkup, { articleSchema, breadcrumbSchema } from '../components/SchemaMarkup';
 import { updatePageSEO } from '../utils/seo';
@@ -13,14 +13,18 @@ export default function BlogPostPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchPost();
+    if (!slug) return;
+    blog.get(slug)
+      .then(setPost)
+      .catch(err => console.error('Error fetching post:', err))
+      .finally(() => setLoading(false));
   }, [slug]);
 
   useEffect(() => {
     if (post) {
       updatePageSEO({
         title: `${post.title} | Marq Legal Blog`,
-        description: post.excerpt,
+        description: post.excerpt || '',
         canonical: `https://marqtrademarks.com/blog/${post.slug}`,
         ogType: 'article',
         keywords: post.tags.join(', ')
@@ -28,40 +32,20 @@ export default function BlogPostPage() {
     }
   }, [post]);
 
-  const fetchPost = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('blog_posts')
-        .select('*')
-        .eq('slug', slug)
-        .maybeSingle();
-
-      if (error) throw error;
-      setPost(data);
-    } catch (error) {
-      console.error('Error fetching post:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-slate-800"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy-900" />
       </div>
     );
   }
 
   if (!post) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-slate-900 mb-4">Article Not Found</h1>
-          <button
-            onClick={() => navigate('/blog')}
-            className="text-amber-600 hover:text-amber-700 font-medium"
-          >
+          <h1 className="text-3xl font-bold text-navy-900 mb-4">Article Not Found</h1>
+          <button onClick={() => navigate('/blog')} className="text-gold-600 hover:text-gold-700 font-medium">
             Return to Blog
           </button>
         </div>
@@ -71,18 +55,18 @@ export default function BlogPostPage() {
 
   const articleSchemaData = articleSchema({
     headline: post.title,
-    description: post.excerpt,
+    description: post.excerpt || '',
     author: post.author,
-    datePublished: post.published_date,
-    dateModified: post.updated_at || post.published_date,
+    datePublished: post.publishedDate,
+    dateModified: post.publishedDate,
     url: `https://marqtrademarks.com/blog/${post.slug}`,
-    tags: post.tags
+    tags: post.tags,
   });
 
   const breadcrumbs = breadcrumbSchema([
-    { name: "Home", url: "https://marqtrademarks.com" },
-    { name: "Blog", url: "https://marqtrademarks.com/blog" },
-    { name: post.title, url: `https://marqtrademarks.com/blog/${post.slug}` }
+    { name: 'Home', url: 'https://marqtrademarks.com' },
+    { name: 'Blog', url: 'https://marqtrademarks.com/blog' },
+    { name: post.title, url: `https://marqtrademarks.com/blog/${post.slug}` },
   ]);
 
   return (
@@ -91,68 +75,62 @@ export default function BlogPostPage() {
       <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <button
           onClick={() => navigate('/blog')}
-          className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-8 font-medium"
+          className="flex items-center gap-2 text-slate-500 hover:text-navy-900 mb-8 font-medium text-sm transition-colors"
         >
-          <ArrowLeft size={20} />
+          <ArrowLeft size={18} />
           Back to Blog
         </button>
 
         <div className="mb-8">
-          <div className="text-sm font-semibold text-amber-600 mb-3">{post.category}</div>
-          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6 leading-tight">
-            {post.title}
-          </h1>
+          <div className="text-xs font-semibold text-gold-600 uppercase tracking-widest mb-3">{post.category}</div>
+          <h1 className="text-4xl md:text-5xl font-bold text-navy-900 mb-6 leading-tight">{post.title}</h1>
 
-          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 mb-6">
-            <div className="flex items-center gap-2">
-              <Calendar size={18} />
-              <span>{new Date(post.published_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+          <div className="flex flex-wrap items-center gap-5 text-sm text-slate-500 mb-6">
+            <div className="flex items-center gap-1.5">
+              <Calendar size={15} />
+              <span>{new Date(post.publishedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Clock size={18} />
-              <span>{post.reading_time} min read</span>
+            <div className="flex items-center gap-1.5">
+              <Clock size={15} />
+              <span>{post.readingTime} min read</span>
             </div>
-            <div>By {post.author}</div>
+            <span>By {post.author}</span>
           </div>
 
           <div className="flex flex-wrap gap-2 mb-8">
-            {post.tags.map((tag, index) => (
-              <span
-                key={index}
-                className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm"
-              >
-                <Tag size={14} />
+            {post.tags.map((tag, i) => (
+              <span key={i} className="inline-flex items-center gap-1 px-3 py-1 bg-navy-50 text-navy-700 rounded-full text-xs font-medium">
+                <Tag size={11} />
                 {tag}
               </span>
             ))}
           </div>
         </div>
 
-        <div className="max-w-none">
-          <div className="text-lg text-slate-700 mb-6 leading-normal border-l-4 border-amber-500 pl-6 italic">
-            {post.excerpt}
-          </div>
-
+        <div>
+          {post.excerpt && (
+            <div className="text-lg text-slate-700 mb-8 leading-relaxed border-l-4 border-gold-400 pl-6 italic">
+              {post.excerpt}
+            </div>
+          )}
           <div
             className="prose prose-slate max-w-none text-base text-slate-800"
-            style={{ lineHeight: '1.7' }}
-            dangerouslySetInnerHTML={{ __html: post.content }}
+            style={{ lineHeight: '1.8' }}
+            dangerouslySetInnerHTML={{ __html: formatBlogContent(post.content || '') }}
           />
         </div>
 
-        <div className="mt-12 pt-8 border-t border-slate-200">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-8 text-white">
-            <h3 className="text-2xl font-bold mb-4">Need Help with Your Trademark?</h3>
-            <p className="text-slate-300 mb-6">
-              Our experienced attorneys are here to guide you through every step of the trademark process.
-              From comprehensive searches to registration and enforcement, we make trademark protection
-              simple and affordable.
+        <div className="mt-14 pt-8 border-t border-slate-200">
+          <div className="bg-navy-950 rounded-2xl p-8 text-white">
+            <h3 className="text-2xl font-bold mb-3">Need Help with Your Trademark?</h3>
+            <p className="text-slate-300 mb-6 leading-relaxed">
+              Our experienced attorneys are here to guide you through every step of the trademark process — from search to registration and enforcement.
             </p>
             <button
               onClick={() => navigate('/get-started')}
-              className="bg-amber-500 text-slate-900 px-6 py-3 rounded-lg font-semibold hover:bg-amber-400 transition-colors"
+              className="bg-gold-500 hover:bg-gold-400 text-navy-950 px-6 py-3 rounded-xl font-semibold transition-all"
             >
-              Explore Our Services
+              Get Started Today
             </button>
           </div>
         </div>
@@ -160,9 +138,9 @@ export default function BlogPostPage() {
         <div className="mt-8 text-center">
           <button
             onClick={() => navigate('/blog')}
-            className="text-amber-600 hover:text-amber-700 font-medium inline-flex items-center gap-2"
+            className="text-navy-700 hover:text-navy-900 font-medium inline-flex items-center gap-2 text-sm"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={16} />
             Back to All Articles
           </button>
         </div>
