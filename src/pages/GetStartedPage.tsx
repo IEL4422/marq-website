@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Upload, Check, Loader2, CheckCircle, XCircle, ExternalLink, AlertTriangle, Type, MessageSquare, Image as ImageIcon, Sparkles } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { ChevronLeft, ChevronRight, Upload, Check, Loader2, CheckCircle, AlertTriangle, Type, MessageSquare, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { searchRequests } from '../lib/api';
 import { trackAnalyticsEvent, trackConversion } from '../utils/tracking';
 import { notifyQuestionnaireCompleted } from '../utils/notifications';
 
@@ -30,25 +30,6 @@ interface FormData {
   confirmationUnderstand: boolean;
 }
 
-interface TrademarkResult {
-  keyword: string;
-  serialNumber: string;
-  registrationNumber?: string;
-  markIdentification: string;
-  status: string;
-  statusLabel?: string;
-  statusCode?: string;
-  statusDate: string;
-  statusDefinition?: string;
-  filingDate: string;
-  registrationDate?: string;
-  abandonmentDate?: string;
-  expirationDate?: string;
-  logo?: string;
-  description?: string;
-  owner: string;
-  goodsServices?: string;
-}
 
 export default function GetStartedPage() {
   const navigate = useNavigate();
@@ -60,9 +41,7 @@ export default function GetStartedPage() {
   const [currentScreen, setCurrentScreen] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState('Trademark Registration Package');
-  const [savedResponseId, setSavedResponseId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<TrademarkResult[]>([]);
   const [searchCompleted, setSearchCompleted] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [formData, setFormData] = useState<FormData>({
@@ -120,22 +99,15 @@ export default function GetStartedPage() {
     setSearching(true);
     setSearchCompleted(false);
     setSearchError('');
-    setSearchResults([]);
 
     try {
-      const { error: insertError } = await supabase
-        .from('trademark_search_requests')
-        .insert({
-          trademark_name: formData.trademarkName.trim(),
-          full_name: formData.fullName || 'Unknown',
-          email: formData.email || 'pending@email.com',
-          business_description: `Search request from Get Started form. Business Type: ${formData.businessType || 'N/A'}. Phone: ${formData.phone || 'N/A'}`,
-          status: 'pending'
-        });
-
-      if (insertError) {
-        console.error('Error creating search request:', insertError);
-      }
+      await searchRequests.create({
+        trademarkName: formData.trademarkName.trim(),
+        clientName: formData.fullName || 'Unknown',
+        clientEmail: formData.email || 'pending@email.com',
+        clientPhone: formData.phone || '',
+        businessDescription: `Search request from Get Started form. Business Type: ${formData.businessType || 'N/A'}`
+      });
 
       trackAnalyticsEvent('trademark_search_requested', {
         trademark_name: formData.trademarkName,
@@ -157,29 +129,6 @@ export default function GetStartedPage() {
     if (!file) return;
 
     updateFormData('logoFile', file);
-  };
-
-  const uploadLogo = async (): Promise<string | null> => {
-    if (!formData.logoFile) return null;
-
-    const fileExt = formData.logoFile.name.split('.').pop();
-    const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-    const filePath = `logos/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('trademark-logos')
-      .upload(filePath, formData.logoFile);
-
-    if (uploadError) {
-      console.error('Error uploading logo:', uploadError);
-      return null;
-    }
-
-    const { data } = supabase.storage
-      .from('trademark-logos')
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
   };
 
   const validateScreen = (): boolean => {
@@ -226,49 +175,6 @@ export default function GetStartedPage() {
 
       const nextScreen = Math.min(currentScreen + 1, totalScreens);
 
-      if (currentScreen === 6 && !savedResponseId) {
-        try {
-          const logoUrl = formData.logoFile ? await uploadLogo() : null;
-          const { data: { user } } = await supabase.auth.getUser();
-
-          const { data, error } = await supabase
-            .from('trademark_questionnaire_responses')
-            .insert({
-              user_id: user?.id || null,
-              trademark_name: formData.trademarkName || null,
-              trademark_type: formData.trademarkType || null,
-              logo_url: logoUrl,
-              name_in_use: formData.nameInUse || null,
-              name_in_use_start_date: formData.nameInUseStartDate || null,
-              name_in_use_plan_date: formData.nameInUsePlanDate || null,
-              business_type: formData.businessType || null,
-              brand_usage_locations: formData.brandUsageLocations,
-              website_url: formData.websiteUrl || null,
-              social_media_accounts: formData.socialMediaAccounts || null,
-              products_services_description: formData.productsServicesDescription || null,
-              product_service_type: formData.productServiceType || null,
-              sales_locations: formData.salesLocations,
-              prior_trademark_filing: formData.priorTrademarkFiling || null,
-              similar_business_names: formData.similarBusinessNames || null,
-              additional_info: formData.additionalInfo || null,
-              full_name: formData.fullName,
-              email: formData.email,
-              phone: formData.phone || null,
-              package_selected: null,
-              confirmation_accurate: false,
-              confirmation_understand: false,
-            })
-            .select()
-            .single();
-
-          if (!error && data) {
-            setSavedResponseId(data.id);
-          }
-        } catch (error) {
-          console.error('Error saving partial form:', error);
-        }
-      }
-
       setCurrentScreen(nextScreen);
 
       trackAnalyticsEvent('get_started_form_progress', {
@@ -311,10 +217,6 @@ export default function GetStartedPage() {
     setIsSubmitting(true);
 
     try {
-      const logoUrl = await uploadLogo();
-
-      const { data: { user } } = await supabase.auth.getUser();
-
       const finalPackageName = packageFromPricing || selectedPackage;
 
       const packageDetails: { [key: string]: { price: string; description: string } } = {
@@ -326,81 +228,14 @@ export default function GetStartedPage() {
 
       const selectedPackageDetails = packageDetails[finalPackageName] || packageDetails['Trademark Registration Package'];
 
-      let error;
-
-      if (savedResponseId) {
-        const result = await supabase
-          .from('trademark_questionnaire_responses')
-          .update({
-            trademark_name: formData.trademarkName,
-            trademark_type: formData.trademarkType,
-            logo_url: logoUrl || undefined,
-            name_in_use: formData.nameInUse,
-            name_in_use_start_date: formData.nameInUseStartDate || null,
-            name_in_use_plan_date: formData.nameInUsePlanDate || null,
-            business_type: formData.businessType,
-            brand_usage_locations: formData.brandUsageLocations,
-            website_url: formData.websiteUrl || null,
-            social_media_accounts: formData.socialMediaAccounts || null,
-            products_services_description: formData.productsServicesDescription,
-            product_service_type: formData.productServiceType,
-            sales_locations: formData.salesLocations,
-            prior_trademark_filing: formData.priorTrademarkFiling,
-            similar_business_names: formData.similarBusinessNames,
-            additional_info: formData.additionalInfo || null,
-            full_name: formData.fullName,
-            email: formData.email,
-            phone: formData.phone,
-            package_selected: finalPackageName,
-            confirmation_accurate: formData.confirmationAccurate,
-            confirmation_understand: formData.confirmationUnderstand,
-          })
-          .eq('id', savedResponseId);
-        error = result.error;
-      } else {
-        const result = await supabase
-          .from('trademark_questionnaire_responses')
-          .insert({
-            user_id: user?.id || null,
-            trademark_name: formData.trademarkName,
-            trademark_type: formData.trademarkType,
-            logo_url: logoUrl,
-            name_in_use: formData.nameInUse,
-            name_in_use_start_date: formData.nameInUseStartDate || null,
-            name_in_use_plan_date: formData.nameInUsePlanDate || null,
-            business_type: formData.businessType,
-            brand_usage_locations: formData.brandUsageLocations,
-            website_url: formData.websiteUrl || null,
-            social_media_accounts: formData.socialMediaAccounts || null,
-            products_services_description: formData.productsServicesDescription,
-            product_service_type: formData.productServiceType,
-            sales_locations: formData.salesLocations,
-            prior_trademark_filing: formData.priorTrademarkFiling,
-            similar_business_names: formData.similarBusinessNames,
-            additional_info: formData.additionalInfo || null,
-            full_name: formData.fullName,
-            email: formData.email,
-            phone: formData.phone,
-            package_selected: finalPackageName,
-            confirmation_accurate: formData.confirmationAccurate,
-            confirmation_understand: formData.confirmationUnderstand,
-          })
-          .select();
-        error = result.error;
-
-        if (!error && result.data && result.data[0]) {
-          notifyQuestionnaireCompleted(
-            formData.fullName,
-            formData.email,
-            formData.trademarkName,
-            formData.phone,
-            finalPackageName,
-            result.data[0].id
-          ).catch(err => console.error('Notification error:', err));
-        }
-      }
-
-      if (error) throw error;
+      notifyQuestionnaireCompleted(
+        formData.fullName,
+        formData.email,
+        formData.trademarkName,
+        formData.phone,
+        finalPackageName,
+        ''
+      ).catch(err => console.error('Notification error:', err));
 
       trackAnalyticsEvent('get_started_form_completed', {
         session_id: sessionId.current,

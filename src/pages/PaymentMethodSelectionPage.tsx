@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { CreditCard, Calendar, ArrowRight, DollarSign, Check } from 'lucide-react';
-import { ServicePackage } from '../lib/supabase';
+interface ServicePackage { name: string; price: string; description: string; }
 
 export default function PaymentMethodSelectionPage() {
   const navigate = useNavigate();
@@ -51,10 +51,9 @@ export default function PaymentMethodSelectionPage() {
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-payment-plan-webhook`, {
+      const response = await fetch('/api/notifications/zapier', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

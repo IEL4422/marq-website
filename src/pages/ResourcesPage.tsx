@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, FileText, MessageSquare, AlertCircle, CheckCircle, HelpCircle } from 'lucide-react';
-import { supabase, EducationalGuide } from '../lib/supabase';
+import { guides as guidesApi, EducationalGuide } from '../lib/api';
 
 export default function ResourcesPage() {
   const navigate = useNavigate();
@@ -14,13 +14,8 @@ export default function ResourcesPage() {
 
   const fetchGuides = async () => {
     try {
-      const { data, error } = await supabase
-        .from('educational_guides')
-        .select('*')
-        .order('order_index');
-
-      if (error) throw error;
-      setGuides(data || []);
+      const data = await guidesApi.list();
+      setGuides(data);
     } catch (error) {
       console.error('Error fetching guides:', error);
     } finally {
@@ -133,7 +128,7 @@ export default function ResourcesPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {guides.map((guide) => (
                 <button
-                  key={guide.id}
+                  key={guide._id}
                   onClick={() => navigate(`/resources/${guide.slug}`)}
                   className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all hover:border-amber-400 text-left"
                 >

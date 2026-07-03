@@ -1,56 +1,9 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle2, Circle, Mail, Send, BookOpen, AlertCircle, LogOut, Info, FileText, Clock } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { CheckCircle2, Circle, Mail, Send, BookOpen, AlertCircle, LogOut, Info } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { cases as casesApi, matters as mattersApi } from '../lib/api';
+import type { ClientCase, TrademarkMatter, CaseMessage, Todo } from '../lib/api';
 import AmazonBrandRegistryGuide from '../components/AmazonBrandRegistryGuide';
-
-interface ClientCase {
-  id: string;
-  client_email: string;
-  client_name: string;
-  trademark_name: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  estimated_completion_date: string | null;
-  payment_id: string | null;
-  package_name: string | null;
-  package_price: string | null;
-  purchase_date: string | null;
-}
-
-interface TrademarkMatter {
-  id: string;
-  client_id: string;
-  client_docket: string;
-  stage: string;
-  progress: number;
-  intake_completed_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface MatterTodo {
-  id: string;
-  matter_id: string;
-  title: string;
-  description: string | null;
-  due_date: string;
-  completed_at: string | null;
-  created_at: string;
-}
-
-interface Message {
-  id: string;
-  case_id: string;
-  sender_email: string;
-  sender_name: string;
-  message: string;
-  is_staff: boolean;
-  created_at: string;
-  read: boolean;
-}
 
 const STATUS_STEPS = [
   {
@@ -80,12 +33,11 @@ const STATUS_STEPS = [
 ];
 
 export default function ClientPortalPage() {
-  const navigate = useNavigate();
   const { user, loading: authLoading, signUp, signIn, signOut } = useAuth();
   const [clientCase, setClientCase] = useState<ClientCase | null>(null);
   const [trademarkMatter, setTrademarkMatter] = useState<TrademarkMatter | null>(null);
-  const [todos, setTodos] = useState<MatterTodo[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [messages, setMessages] = useState<CaseMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -97,72 +49,40 @@ export default function ClientPortalPage() {
   const [expandedStage, setExpandedStage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user?.id) {
-      fetchClientCase(user.email!);
+    if (user) {
+      fetchClientCase();
       fetchTrademarkMatter();
     }
   }, [user]);
 
   const fetchTrademarkMatter = async () => {
     try {
-      const { data: matterData, error: matterError } = await supabase
-        .from('trademark_matters')
-        .select('*')
-        .eq('client_id', user?.id)
-        .order('created_at', { ascending: false })
-        .maybeSingle();
-
-      if (matterError) throw matterError;
-
-      if (matterData) {
-        setTrademarkMatter(matterData);
-        fetchTodos(matterData.id);
+      const myMatters = await mattersApi.myMatters();
+      if (myMatters && myMatters.length > 0) {
+        const sorted = [...myMatters].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setTrademarkMatter(sorted[0]);
+        setTodos(sorted[0].todos || []);
       }
     } catch (err) {
       console.error('Error fetching trademark matter:', err);
     }
   };
 
-  const fetchTodos = async (matterId: string) => {
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('matter_todos')
-        .select('*')
-        .eq('matter_id', matterId)
-        .order('due_date', { ascending: true });
-
-      if (fetchError) throw fetchError;
-      if (data) setTodos(data);
-    } catch (err) {
-      console.error('Error fetching todos:', err);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === 'messages' && clientCase) {
-      markMessagesAsRead();
-    }
-  }, [activeTab, clientCase]);
-
-  const fetchClientCase = async (clientEmail: string) => {
+  const fetchClientCase = async () => {
     try {
       setLoading(true);
       setError('');
-
-      const { data, error: fetchError } = await supabase
-        .from('client_cases')
-        .select('*')
-        .eq('client_email', clientEmail)
-        .order('created_at', { ascending: false })
-        .maybeSingle();
-
-      if (fetchError) throw fetchError;
-
-      if (data) {
-        setClientCase(data);
-        fetchMessages(data.id);
+      const myCases = await casesApi.myCases();
+      if (myCases && myCases.length > 0) {
+        const sorted = [...myCases].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setClientCase(sorted[0]);
+        setMessages(sorted[0].messages || []);
       } else {
-        setError('No case found for this email address.');
+        setError('No case found for your account.');
       }
     } catch (err) {
       setError('Failed to load case information. Please try again.');
@@ -172,56 +92,16 @@ export default function ClientPortalPage() {
     }
   };
 
-  const fetchMessages = async (caseId: string) => {
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('case_messages')
-        .select('*')
-        .eq('case_id', caseId)
-        .order('created_at', { ascending: true });
-
-      if (fetchError) throw fetchError;
-      if (data) setMessages(data);
-    } catch (err) {
-      console.error('Error fetching messages:', err);
-    }
-  };
-
-  const markMessagesAsRead = async () => {
-    if (!clientCase) return;
-
-    try {
-      const { error } = await supabase
-        .from('case_messages')
-        .update({ read: true })
-        .eq('case_id', clientCase.id)
-        .eq('is_staff', true)
-        .eq('read', false);
-
-      if (error) throw error;
-
-      setMessages(prevMessages =>
-        prevMessages.map(msg =>
-          msg.is_staff ? { ...msg, read: true } : msg
-        )
-      );
-    } catch (err) {
-      console.error('Error marking messages as read:', err);
-    }
-  };
-
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-
     try {
       const { error: authError } = isSignUp
         ? await signUp(email, password)
         : await signIn(email, password);
-
       if (authError) {
-        setError(authError.message);
+        setError(authError.message || 'Authentication failed. Please try again.');
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
@@ -230,8 +110,8 @@ export default function ClientPortalPage() {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
+  const handleSignOut = () => {
+    signOut();
     setClientCase(null);
     setMessages([]);
   };
@@ -242,20 +122,14 @@ export default function ClientPortalPage() {
 
     setSendingMessage(true);
     try {
-      const { error: insertError } = await supabase
-        .from('case_messages')
-        .insert({
-          case_id: clientCase.id,
-          sender_email: user.email,
-          sender_name: clientCase.client_name,
-          message: newMessage.trim(),
-          is_staff: false
-        });
-
-      if (insertError) throw insertError;
-
+      await casesApi.sendMessage(clientCase._id, newMessage.trim());
       setNewMessage('');
-      fetchMessages(clientCase.id);
+      // Reload case to get updated messages
+      const myCases = await casesApi.myCases();
+      if (myCases && myCases.length > 0) {
+        const updated = myCases.find(c => c._id === clientCase._id) || myCases[0];
+        setMessages(updated.messages || []);
+      }
     } catch (err) {
       console.error('Error sending message:', err);
       alert('Failed to send message. Please try again.');
@@ -273,7 +147,7 @@ export default function ClientPortalPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-800 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mx-auto"></div>
           <p className="mt-4 text-slate-600">Loading...</p>
         </div>
       </div>
@@ -284,21 +158,23 @@ export default function ClientPortalPage() {
     return (
       <div className="min-h-screen bg-slate-50 py-12">
         <div className="max-w-md mx-auto px-4">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-900 mx-auto mb-4">
+              <span className="text-amber-400 font-bold text-lg">M</span>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 mb-2 text-center">
               {isSignUp ? 'Create Your Account' : 'Client Portal Login'}
             </h1>
-            <p className="text-slate-600 mb-6">
+            <p className="text-slate-500 mb-6 text-center text-sm">
               {isSignUp
                 ? 'Create an account to access your case information'
-                : 'Sign in to access your case information'
-              }
+                : 'Sign in to access your case information'}
             </p>
 
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
               <div className="flex items-start gap-2">
-                <Info className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
-                <div className="text-sm text-blue-800">
+                <Info className="text-amber-600 flex-shrink-0 mt-0.5" size={18} />
+                <div className="text-sm text-amber-900">
                   <p className="font-medium mb-1">Important</p>
                   <p>Please use the same email address you used when purchasing our services. This ensures your case information is correctly linked to your account.</p>
                 </div>
@@ -314,7 +190,7 @@ export default function ClientPortalPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none transition"
                   placeholder="your.email@example.com"
                   required
                   disabled={loading}
@@ -329,7 +205,7 @@ export default function ClientPortalPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none transition"
                   placeholder="Enter your password"
                   required
                   minLength={6}
@@ -341,7 +217,7 @@ export default function ClientPortalPage() {
               </div>
 
               {error && (
-                <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
                   <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={18} />
                   <p className="text-sm text-red-800">{error}</p>
                 </div>
@@ -350,7 +226,7 @@ export default function ClientPortalPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-slate-800 text-white py-2.5 rounded-lg font-medium hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-slate-900 text-white py-2.5 rounded-xl font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Please wait...' : isSignUp ? 'Create Account' : 'Sign In'}
               </button>
@@ -362,12 +238,11 @@ export default function ClientPortalPage() {
                   setIsSignUp(!isSignUp);
                   setError('');
                 }}
-                className="text-sm text-slate-600 hover:text-slate-900"
+                className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
               >
                 {isSignUp
                   ? 'Already have an account? Sign in'
-                  : "Don't have an account? Create one"
-                }
+                  : "Don't have an account? Create one"}
               </button>
             </div>
           </div>
@@ -376,40 +251,59 @@ export default function ClientPortalPage() {
     );
   }
 
-  if (loading || !clientCase) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-800 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mx-auto"></div>
           <p className="mt-4 text-slate-600">Loading your case...</p>
-          {!loading && !clientCase && (
-            <div className="mt-4 max-w-md">
-              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={18} />
-                <p className="text-sm text-amber-800">No case found for your email. Please contact support if you believe this is an error.</p>
-              </div>
-            </div>
-          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!clientCase) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center max-w-md px-4">
+          <div className="flex items-start gap-2 p-4 bg-amber-50 border border-amber-200 rounded-xl mb-6">
+            <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={18} />
+            <p className="text-sm text-amber-900">
+              {error || 'No case found for your account. Please contact support if you believe this is an error.'}
+            </p>
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 mx-auto px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
+          >
+            <LogOut size={16} />
+            Sign Out
+          </button>
         </div>
       </div>
     );
   }
 
   const currentStatusIndex = getCurrentStatusIndex();
+  const unreadCount = messages.filter(m => m.isStaff && !m.read).length;
 
   return (
     <div className="min-h-screen bg-slate-50 py-12">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-8 py-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-slate-900 px-8 py-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-white mb-1">Welcome, {clientCase.client_name}</h1>
-                <p className="text-slate-200">Trademark: {clientCase.trademark_name}</p>
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="w-2 h-2 rounded-full bg-amber-400"></div>
+                  <p className="text-amber-400 text-sm font-medium uppercase tracking-wide">Client Portal</p>
+                </div>
+                <h1 className="text-2xl font-bold text-white mb-1">Welcome, {clientCase.clientName}</h1>
+                <p className="text-slate-300">Trademark: <span className="text-amber-300 font-medium">{clientCase.trademarkName}</span></p>
               </div>
               <button
                 onClick={handleSignOut}
-                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors text-sm font-medium"
+                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors text-sm font-medium border border-white/20"
               >
                 <LogOut size={16} />
                 Sign Out
@@ -423,8 +317,8 @@ export default function ClientPortalPage() {
                 onClick={() => setActiveTab('status')}
                 className={`flex-1 px-6 py-4 font-medium text-sm transition-colors ${
                   activeTab === 'status'
-                    ? 'text-slate-900 border-b-2 border-slate-800 bg-slate-50'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'text-slate-900 border-b-2 border-amber-500 bg-amber-50/50'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
                 Status Tracking
@@ -433,14 +327,14 @@ export default function ClientPortalPage() {
                 onClick={() => setActiveTab('messages')}
                 className={`flex-1 px-6 py-4 font-medium text-sm transition-colors ${
                   activeTab === 'messages'
-                    ? 'text-slate-900 border-b-2 border-slate-800 bg-slate-50'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'text-slate-900 border-b-2 border-amber-500 bg-amber-50/50'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
                 Messages
-                {messages.filter(m => m.is_staff && !m.read).length > 0 && (
-                  <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
-                    {messages.filter(m => m.is_staff && !m.read).length}
+                {unreadCount > 0 && (
+                  <span className="ml-2 px-2 py-0.5 bg-amber-500 text-white text-xs rounded-full font-bold">
+                    {unreadCount}
                   </span>
                 )}
               </button>
@@ -448,8 +342,8 @@ export default function ClientPortalPage() {
                 onClick={() => setActiveTab('learning')}
                 className={`flex-1 px-6 py-4 font-medium text-sm transition-colors ${
                   activeTab === 'learning'
-                    ? 'text-slate-900 border-b-2 border-slate-800 bg-slate-50'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'text-slate-900 border-b-2 border-amber-500 bg-amber-50/50'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
                 Learning Center
@@ -461,12 +355,12 @@ export default function ClientPortalPage() {
             {activeTab === 'status' && (
               <div className="space-y-8">
                 {trademarkMatter && (
-                  <div className="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6">
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
                     <h2 className="text-lg font-semibold text-slate-900 mb-4">Matter Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Docket Number</p>
-                        <p className="text-base font-semibold text-slate-900">{trademarkMatter.client_docket}</p>
+                        <p className="text-base font-semibold text-slate-900">{trademarkMatter.docketNumber}</p>
                       </div>
                       <div>
                         <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Current Stage</p>
@@ -489,37 +383,34 @@ export default function ClientPortalPage() {
                 )}
 
                 {todos.length > 0 && (
-                  <div className="border border-slate-200 rounded-xl p-6">
+                  <div className="border border-slate-200 rounded-2xl p-6">
                     <h2 className="text-lg font-semibold text-slate-900 mb-4">Action Items</h2>
                     <div className="space-y-3">
-                      {todos.map(todo => (
+                      {todos.map((todo, idx) => (
                         <div
-                          key={todo.id}
-                          className={`flex items-start gap-3 p-4 rounded-lg ${
-                            todo.completed_at
+                          key={idx}
+                          className={`flex items-start gap-3 p-4 rounded-xl ${
+                            todo.completed
                               ? 'bg-green-50 border border-green-200'
-                              : new Date(todo.due_date) < new Date()
+                              : todo.dueDate && new Date(todo.dueDate) < new Date()
                               ? 'bg-red-50 border border-red-200'
                               : 'bg-slate-50 border border-slate-200'
                           }`}
                         >
-                          {todo.completed_at ? (
+                          {todo.completed ? (
                             <CheckCircle2 className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
                           ) : (
                             <Circle className="text-slate-400 flex-shrink-0 mt-0.5" size={20} />
                           )}
                           <div className="flex-1">
-                            <h3 className={`font-semibold ${todo.completed_at ? 'text-green-900' : 'text-slate-900'}`}>
+                            <h3 className={`font-semibold ${todo.completed ? 'text-green-900' : 'text-slate-900'}`}>
                               {todo.title}
                             </h3>
-                            {todo.description && (
-                              <p className="text-sm text-slate-600 mt-1">{todo.description}</p>
-                            )}
                             <p className="text-xs text-slate-500 mt-2">
-                              {todo.completed_at ? (
-                                <>Completed: {new Date(todo.completed_at).toLocaleDateString()}</>
+                              {todo.completed ? (
+                                <>Completed</>
                               ) : (
-                                <>Due: {new Date(todo.due_date).toLocaleDateString()}</>
+                                <>Due: {todo.dueDate ? new Date(todo.dueDate).toLocaleDateString() : 'N/A'}</>
                               )}
                             </p>
                           </div>
@@ -529,34 +420,8 @@ export default function ClientPortalPage() {
                   </div>
                 )}
 
-                {clientCase && clientCase.package_name && clientCase.purchase_date && (
-                  <div className="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6">
-                    <h2 className="text-lg font-semibold text-slate-900 mb-4">Package Summary</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Package Purchased</p>
-                        <p className="text-base font-semibold text-slate-900">{clientCase.package_name}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Price</p>
-                        <p className="text-base font-semibold text-slate-900">{clientCase.package_price}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Purchase Date</p>
-                        <p className="text-base font-semibold text-slate-900">
-                          {new Date(clientCase.purchase_date).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {clientCase.status === 'Successfully Registered' && (
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-8 text-center">
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-2xl p-8 text-center">
                     <div className="inline-flex items-center justify-center w-16 h-16 bg-green-500 rounded-full mb-4">
                       <CheckCircle2 className="text-white" size={32} />
                     </div>
@@ -564,7 +429,7 @@ export default function ClientPortalPage() {
                       Congratulations!
                     </h2>
                     <p className="text-green-800 text-lg">
-                      Your trademark <span className="font-semibold">{clientCase.trademark_name}</span> is now officially registered with the USPTO.
+                      Your trademark <span className="font-semibold">{clientCase.trademarkName}</span> is now officially registered with the USPTO.
                     </p>
                   </div>
                 )}
@@ -575,20 +440,19 @@ export default function ClientPortalPage() {
                     {STATUS_STEPS.map((step, index) => {
                       const isCompleted = index < currentStatusIndex;
                       const isCurrent = index === currentStatusIndex;
-                      const isPending = index > currentStatusIndex;
                       const isExpanded = expandedStage === step.key;
 
                       return (
-                        <div key={step.key} className="border border-slate-200 rounded-lg overflow-hidden">
+                        <div key={step.key} className="border border-slate-200 rounded-2xl overflow-hidden">
                           <div className="flex items-start gap-4 p-4 bg-white">
                             <div className="flex-shrink-0">
                               {isCompleted ? (
                                 <CheckCircle2 className="text-green-600" size={28} />
                               ) : isCurrent ? (
                                 <div className="relative">
-                                  <Circle className="text-slate-800" size={28} />
+                                  <Circle className="text-amber-500" size={28} />
                                   <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-3 h-3 bg-slate-800 rounded-full"></div>
+                                    <div className="w-3 h-3 bg-amber-500 rounded-full"></div>
                                   </div>
                                 </div>
                               ) : (
@@ -605,14 +469,14 @@ export default function ClientPortalPage() {
                                 {(isCurrent || isCompleted) && (
                                   <button
                                     onClick={() => setExpandedStage(isExpanded ? null : step.key)}
-                                    className="text-sm text-slate-600 hover:text-slate-900 font-medium"
+                                    className="text-sm text-amber-600 hover:text-amber-700 font-medium"
                                   >
                                     {isExpanded ? 'Hide Details' : 'Learn More'}
                                   </button>
                                 )}
                               </div>
                               {isCurrent && !isExpanded && (
-                                <p className="text-sm text-slate-600 mt-1">Currently in progress</p>
+                                <p className="text-sm text-slate-500 mt-1">Currently in progress</p>
                               )}
                             </div>
                           </div>
@@ -636,31 +500,29 @@ export default function ClientPortalPage() {
                 </div>
 
                 <div className="space-y-4">
-                  {clientCase.estimated_completion_date && clientCase.status !== 'Successfully Registered' && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <p className="text-sm font-medium text-blue-900 mb-1">Estimated Completion Date</p>
-                      <p className="text-lg font-semibold text-blue-900">
-                        {new Date(clientCase.estimated_completion_date).toLocaleDateString('en-US', {
+                  {clientCase.estimatedCompletion && clientCase.status !== 'Successfully Registered' && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                      <p className="text-sm font-medium text-amber-900 mb-1">Estimated Completion Date</p>
+                      <p className="text-lg font-semibold text-amber-900">
+                        {new Date(clientCase.estimatedCompletion).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'long',
                           day: 'numeric'
                         })}
                       </p>
-                      <p className="text-xs text-blue-700 mt-1">
+                      <p className="text-xs text-amber-700 mt-1">
                         This is an estimate and may vary based on USPTO processing times
                       </p>
                     </div>
                   )}
 
-                  <div className="bg-slate-50 rounded-lg p-4">
+                  <div className="bg-slate-50 rounded-2xl p-4">
                     <p className="text-sm text-slate-600">
-                      <span className="font-medium text-slate-900">Last Updated:</span>{' '}
-                      {new Date(clientCase.updated_at).toLocaleDateString('en-US', {
+                      <span className="font-medium text-slate-900">Case Opened:</span>{' '}
+                      {new Date(clientCase.createdAt).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
+                        day: 'numeric'
                       })}
                     </p>
                   </div>
@@ -675,23 +537,23 @@ export default function ClientPortalPage() {
                   <h2 className="text-xl font-bold text-slate-900">Messages</h2>
                 </div>
 
-                <div className="bg-slate-50 rounded-lg p-6 max-h-96 overflow-y-auto space-y-4">
+                <div className="bg-slate-50 rounded-2xl p-6 max-h-96 overflow-y-auto space-y-4">
                   {messages.length === 0 ? (
                     <p className="text-slate-500 text-center py-8">No messages yet. Start a conversation below.</p>
                   ) : (
-                    messages.map((message) => (
+                    messages.map((message, idx) => (
                       <div
-                        key={message.id}
-                        className={`p-4 rounded-lg ${
-                          message.is_staff
-                            ? 'bg-blue-50 border border-blue-200 ml-8'
+                        key={idx}
+                        className={`p-4 rounded-xl ${
+                          message.isStaff
+                            ? 'bg-slate-900/5 border border-slate-200 ml-8'
                             : 'bg-white border border-slate-200 mr-8'
                         }`}
                       >
                         <div className="flex items-start justify-between mb-2">
-                          <p className="font-medium text-slate-900">{message.sender_name}</p>
-                          <span className="text-xs text-slate-500">
-                            {new Date(message.created_at).toLocaleString('en-US', {
+                          <p className="font-medium text-slate-900">{message.sender}</p>
+                          <span className="text-xs text-slate-400">
+                            {new Date(message.sentAt).toLocaleString('en-US', {
                               month: 'short',
                               day: 'numeric',
                               hour: '2-digit',
@@ -713,7 +575,7 @@ export default function ClientPortalPage() {
                     <textarea
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:border-transparent resize-none"
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none resize-none transition"
                       rows={4}
                       placeholder="Type your message here..."
                       required
@@ -722,7 +584,7 @@ export default function ClientPortalPage() {
                   <button
                     type="submit"
                     disabled={sendingMessage || !newMessage.trim()}
-                    className="flex items-center gap-2 bg-slate-800 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Send size={18} />
                     {sendingMessage ? 'Sending...' : 'Send Message'}
@@ -738,7 +600,7 @@ export default function ClientPortalPage() {
                   <h2 className="text-xl font-bold text-slate-900">Learning Center</h2>
                 </div>
 
-                {clientCase.package_name?.toLowerCase().includes('amazon brand registry') && (
+                {clientCase.trademarkName?.toLowerCase().includes('amazon brand registry') && (
                   <div className="mb-8">
                     <AmazonBrandRegistryGuide />
                     <div className="border-t-2 border-slate-200 my-8"></div>
@@ -747,14 +609,14 @@ export default function ClientPortalPage() {
                 )}
 
                 <div className="grid gap-6">
-                  <div className="border border-slate-200 rounded-lg p-6 hover:border-slate-300 transition-colors">
+                  <div className="border border-slate-200 rounded-2xl p-6 hover:border-amber-200 hover:shadow-sm transition-all">
                     <h3 className="font-bold text-slate-900 mb-2">What is a Trademark?</h3>
                     <p className="text-slate-600 mb-4">
                       A trademark is a recognizable sign, design, or expression that identifies products or services from a particular source and distinguishes them from others. It can be a word, phrase, symbol, design, or a combination of these elements.
                     </p>
                   </div>
 
-                  <div className="border border-slate-200 rounded-lg p-6 hover:border-slate-300 transition-colors">
+                  <div className="border border-slate-200 rounded-2xl p-6 hover:border-amber-200 hover:shadow-sm transition-all">
                     <h3 className="font-bold text-slate-900 mb-2">The Trademark Registration Process</h3>
                     <p className="text-slate-600 mb-4">
                       The trademark registration process involves several key steps:
@@ -768,14 +630,14 @@ export default function ClientPortalPage() {
                     </ol>
                   </div>
 
-                  <div className="border border-slate-200 rounded-lg p-6 hover:border-slate-300 transition-colors">
+                  <div className="border border-slate-200 rounded-2xl p-6 hover:border-amber-200 hover:shadow-sm transition-all">
                     <h3 className="font-bold text-slate-900 mb-2">Understanding Trademark Classes</h3>
                     <p className="text-slate-600 mb-4">
                       Trademarks are registered in specific classes of goods or services. There are 45 international classes - 34 for goods and 11 for services. Choosing the right class is crucial for proper protection of your brand.
                     </p>
                   </div>
 
-                  <div className="border border-slate-200 rounded-lg p-6 hover:border-slate-300 transition-colors">
+                  <div className="border border-slate-200 rounded-2xl p-6 hover:border-amber-200 hover:shadow-sm transition-all">
                     <h3 className="font-bold text-slate-900 mb-2">Maintaining Your Trademark</h3>
                     <p className="text-slate-600 mb-4">
                       After registration, you must maintain your trademark by:
@@ -788,7 +650,7 @@ export default function ClientPortalPage() {
                     </ul>
                   </div>
 
-                  <div className="border border-slate-200 rounded-lg p-6 hover:border-slate-300 transition-colors">
+                  <div className="border border-slate-200 rounded-2xl p-6 hover:border-amber-200 hover:shadow-sm transition-all">
                     <h3 className="font-bold text-slate-900 mb-2">Common Trademark Mistakes to Avoid</h3>
                     <p className="text-slate-600 mb-4">
                       Avoid these common pitfalls:

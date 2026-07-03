@@ -1,13 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+// This file is kept for backward compatibility during migration.
+// All functionality has moved to src/lib/api.ts which uses the MongoDB backend.
+// Do not use this file for new code.
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = null as any;
 
 export interface BlogPost {
   id: string;

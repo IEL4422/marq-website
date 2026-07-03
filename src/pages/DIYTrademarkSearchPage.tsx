@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ArrowLeft, Loader2, Info, ExternalLink, CheckCircle2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { searchRequests } from '../lib/api';
 import { trackAnalyticsEvent } from '../utils/tracking';
 
 export default function DIYTrademarkSearchPage() {
@@ -29,17 +29,13 @@ export default function DIYTrademarkSearchPage() {
     setError('');
 
     try {
-      const { error: insertError } = await supabase
-        .from('trademark_search_requests')
-        .insert({
-          trademark_name: formData.trademarkName.trim(),
-          full_name: formData.contactName.trim(),
-          email: formData.email.trim(),
-          business_description: `${formData.phone ? `Phone: ${formData.phone.trim()} | ` : ''}${formData.description.trim() || 'No additional information provided'}`,
-          status: 'pending'
-        });
-
-      if (insertError) throw insertError;
+      await searchRequests.create({
+        trademarkName: formData.trademarkName.trim(),
+        clientName: formData.contactName.trim(),
+        clientEmail: formData.email.trim(),
+        clientPhone: formData.phone?.trim() || '',
+        businessDescription: formData.description.trim() || 'No additional information provided'
+      });
 
       trackAnalyticsEvent('free_search_request_submitted', {
         trademark_name: formData.trademarkName,

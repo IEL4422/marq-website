@@ -62,7 +62,7 @@ export const updatePageSEO = (config: SEOConfig) => {
   }
 
   if (config.articleTags) {
-    config.articleTags.forEach((tag, index) => {
+    config.articleTags.forEach((tag) => {
       updateMetaTag('property', `article:tag`, tag);
     });
   }

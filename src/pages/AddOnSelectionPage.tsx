@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, Minus, ArrowLeft, ArrowRight, Check } from 'lucide-react';
-import { ServicePackage } from '../lib/supabase';
+interface ServicePackage { name: string; price: string; description: string; }
 
 export default function AddOnSelectionPage() {
   const navigate = useNavigate();
@@ -18,8 +18,8 @@ export default function AddOnSelectionPage() {
   const CLASS_PRICE = 350; // USPTO filing fee per additional class
   const USPTO_BASE_FEE = 350; // USPTO filing fee for first class
 
-  const basePrice = parseFloat(selectedPackage.price.replace('$', '').replace(',', ''));
-  const usptoBaseFee = (selectedPackage.name === 'Base Package' || selectedPackage.name === 'Premium Package' || selectedPackage.name === 'Amazon Brand Registry Package') ? USPTO_BASE_FEE : 0;
+  const basePrice = parseFloat(selectedPackage!.price.replace('$', '').replace(',', ''));
+  const usptoBaseFee = (selectedPackage!.name === 'Base Package' || selectedPackage!.name === 'Premium Package' || selectedPackage!.name === 'Amazon Brand Registry Package') ? USPTO_BASE_FEE : 0;
   const classesTotal = additionalClasses * CLASS_PRICE;
   const totalPrice = basePrice + usptoBaseFee + classesTotal;
 

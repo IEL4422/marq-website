@@ -1,7 +1,7 @@
-import { Check, Shield, Crown, Package, DollarSign } from 'lucide-react';
+import { Check, Shield, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
-import { ServicePackage } from '../lib/supabase';
+interface ServicePackage { name: string; price: string; description: string; }
 import { updatePageSEO, pageSEO } from '../utils/seo';
 
 export default function PackageSelectionPage() {

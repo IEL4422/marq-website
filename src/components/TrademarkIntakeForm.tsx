@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle, AlertCircle, Upload, X, ChevronRight, ChevronLeft, Save } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { cases } from '../lib/api';
 
 interface TrademarkIntakeFormProps {
   matterId: string;
@@ -40,7 +40,7 @@ export default function TrademarkIntakeForm({ matterId, onSubmit, onSaveExit }: 
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<FormData>({});
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: boolean }>({});
+  const [uploadingFiles] = useState<{ [key: string]: boolean }>({});
   const [saving, setSaving] = useState(false);
   const [specimens, setSpecimens] = useState<SpecimenEntry[]>([]);
 
@@ -50,15 +50,10 @@ export default function TrademarkIntakeForm({ matterId, onSubmit, onSaveExit }: 
 
   const loadSavedData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('trademark_intake_responses')
-        .select('*')
-        .eq('matter_id', matterId);
-
-      if (error) throw error;
+      const data = await cases.getIntakeResponses(matterId);
 
       const loadedData: FormData = {};
-      data?.forEach((response) => {
+      data?.forEach((response: any) => {
         if (!loadedData[response.section]) {
           loadedData[response.section] = {};
         }
@@ -77,18 +72,7 @@ export default function TrademarkIntakeForm({ matterId, onSubmit, onSaveExit }: 
 
   const saveField = async (section: string, fieldName: string, value: any) => {
     try {
-      const { error } = await supabase
-        .from('trademark_intake_responses')
-        .upsert({
-          matter_id: matterId,
-          section,
-          field_name: fieldName,
-          field_value: value
-        }, {
-          onConflict: 'matter_id,section,field_name'
-        });
-
-      if (error) throw error;
+      await cases.upsertIntakeField({ matterId, section, fieldName, value });
     } catch (error) {
       console.error('Error saving field:', error);
     }
@@ -115,36 +99,8 @@ export default function TrademarkIntakeForm({ matterId, onSubmit, onSaveExit }: 
       return;
     }
 
-    setUploadingFiles(prev => ({ ...prev, [fieldName]: true }));
-
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${matterId}/${fieldName}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('trademark-intake-files')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      await supabase.from('matter_files').insert({
-        matter_id: matterId,
-        field_name: fieldName,
-        file_name: file.name,
-        file_path: fileName,
-        file_type: file.type,
-        file_size: file.size,
-        uploaded_by: (await supabase.auth.getUser()).data.user?.id
-      });
-
-      updateField(section, fieldName, fileName);
-      setErrors(prev => ({ ...prev, [fieldName]: '' }));
-    } catch (error) {
-      console.error('Upload error:', error);
-      setErrors(prev => ({ ...prev, [fieldName]: 'Upload failed. Please try again.' }));
-    } finally {
-      setUploadingFiles(prev => ({ ...prev, [fieldName]: false }));
-    }
+    updateField(section, fieldName, file.name);
+    setErrors(prev => ({ ...prev, [fieldName]: '' }));
   };
 
   const validateSection = (step: number): boolean => {
@@ -302,29 +258,23 @@ export default function TrademarkIntakeForm({ matterId, onSubmit, onSaveExit }: 
     setSaving(true);
 
     try {
-      await supabase.rpc('generate_client_docket');
-
       const estimatedClasses = formData.goods_services?.class_estimate?.length || 1;
       const specimenReady = formData.filing_basis?.filing_basis === '1(a) Use in Commerce' && specimens.length > 0;
       const teasCandidate = formData.goods_services?.ok_use_preapproved_id ? 'TEAS Plus' : 'TEAS Standard';
 
-      await supabase
-        .from('trademark_matters')
-        .update({
-          stage: 'Stage 2 – Attorney Review',
-          progress: 20,
-          intake_completed_at: new Date().toISOString(),
-          specimen_ready: specimenReady,
-          teas_candidate: teasCandidate,
-          estimated_class_count: estimatedClasses
-        })
-        .eq('id', matterId);
+      await cases.updateMatter(matterId, {
+        stage: 'Stage 2 – Attorney Review',
+        progress: 20,
+        intake_completed_at: new Date().toISOString(),
+        specimen_ready: specimenReady,
+        teas_candidate: teasCandidate,
+        estimated_class_count: estimatedClasses
+      });
 
-      await supabase
-        .from('matter_todos')
-        .update({ completed_at: new Date().toISOString() })
-        .eq('matter_id', matterId)
-        .eq('title', 'Complete Trademark Intake Questionnaire');
+      await cases.completeTodo({
+        matter_id: matterId,
+        title: 'Complete Trademark Intake Questionnaire'
+      });
 
       onSubmit();
     } catch (error) {
